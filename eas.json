@@ -1,0 +1,23 @@
+{
+  "cli": {
+    "appVersionSource": "local"
+  },
+  "build": {
+    "apkRelease": {
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "ENV": "production"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "ENV": "production"
+      }
+    }
+  }
+}

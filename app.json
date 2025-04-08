@@ -1,0 +1,57 @@
+{
+  "expo": {
+    "name": "PakHIMS",
+    "slug": "PakHIMS",
+    "version": "1.0.2",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "myapp",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "extra": {
+      "API_BASE_URL": "https://pakhims.com",
+      "PROJECT_ID": "65ec919ffc0cf5f31b2a986b",
+      "CLOUDINARY_URL": "https://api.cloudinary.com/v1_1/dd1chofv4/image/upload",
+      "CLOUDINARY_PRESET": "PAKHIMS",
+      "CLOUDINARY_API_KEY": "881548575377244",
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "d4e17c46-0199-4b9b-92e9-98fa18e386f4"
+      }
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.HIMS.PakHIMS",
+      "versionCode": 3,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
+      "expo-barcode-scanner"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
