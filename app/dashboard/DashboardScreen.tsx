@@ -24,6 +24,8 @@ import {
 import { selectUser } from "../../redux/slices/authSlice";
 import { COLORS } from "@/constants/Colors";
 import InstructionModal from "../../components/InstructionModal"; 
+import AppointmentCard from "../../components/appointment-card";
+
 interface Patient {
   _id: string;
   patientName: string;
@@ -243,6 +245,25 @@ const DashboardScreen = () => {
       params: { appointmentId }
     });
   };
+
+  const handlePrintData = (appointmentId: string): void => {
+    Alert.alert(
+      "Print Prescription",
+      "Would you like to view/print the prescription?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "View",
+          onPress: () => {
+            router.push({
+              pathname: "/appointments/PrescriptionScreen",
+              params: { appointmentId }
+            });
+          }
+        },
+      ]
+    );
+  };
   
   const formatDate = (dateString: string): string => {
     if (!dateString) return "N/A";
@@ -280,7 +301,6 @@ const DashboardScreen = () => {
     return null;
   };
   
-  // Add this function to check if an appointment is expired
   const isAppointmentExpired = (appointment: Appointment): boolean => {
     if (!appointment.appointmentDate || !appointment.appointmentTime?.from) {
       return false;
@@ -289,15 +309,12 @@ const DashboardScreen = () => {
     const today = new Date();
     const appointmentDate = new Date(appointment.appointmentDate);
     
-    // If the appointment date is in the past
     if (appointmentDate.getTime() < today.setHours(0, 0, 0, 0)) {
       return true;
     }
     
-    // Reset today's date after comparison (important!)
     today.setHours(0, 0, 0, 0);
     
-    // If the appointment is today, check if time has passed
     if (appointmentDate.getTime() === today.getTime()) {
       const timeStr = appointment.appointmentTime.from;
       const parsedTime = parseTimeString(timeStr);
@@ -314,122 +331,48 @@ const DashboardScreen = () => {
     return false;
   };
   
-  // Update the renderAppointmentItem function - make sure to include the complete function
   const renderAppointmentItem = ({ item, index }: ListRenderItemInfo<Appointment>): React.ReactElement => {
     const animations = itemAnimations.get(item._id) || {
       fadeAnim: new Animated.Value(1), 
       translateY: new Animated.Value(0)
     };
     
-    let statusText = "Pending";
-    let statusStyle = styles.status_pending;
-    
-    if (item.isApmtCanceled) {
-      statusText = "Cancelled";
-      statusStyle = styles.status_cancelled;
-    } else if (item.isPrescriptionCreated) {
-      statusText = "Completed";
-      statusStyle = styles.status_completed;
-    } else if (isAppointmentExpired(item)) {
-      statusText = "Expired";
-      statusStyle = styles.status_expired;
-    }
-    
-    
     return (
       <Animated.View
-      style={[
-        { opacity: animations.fadeAnim, transform: [{ translateY: animations.translateY }] }
-      ]}
-    >
-      <Card style={styles.card}>
-        <View style={styles.cardContent}>
-          <View style={styles.cardMainInfo}>
-            <View style={styles.patientInfoContainer}>
-              <Text style={styles.patientName} numberOfLines={1}>
-                {item.patientId?.patientName || "Unknown"}
-              </Text>
-              <Text style={styles.mrnText}>
-                MRN: {item.patientId?.mrn || "N/A"}
-              </Text>
-            </View>
-            
-            <Text
-              style={[
-                styles.status,
-                statusStyle
-              ]}
-            >
-              {statusText}
-            </Text>
-          </View>
-            
-            <View style={styles.cardDetailsGrid}>
-              <View style={styles.detailItem}>
-                <Ionicons name="calendar-outline" size={16} color={COLORS.textSecondary} />
-                <Text style={styles.detailText}>{formatDate(item.appointmentDate)}</Text>
-              </View>
-              
-              <View style={styles.detailItem}>
-                <Ionicons name="time-outline" size={16} color={COLORS.textSecondary} />
-                <Text style={styles.detailText}>
-                  {item.appointmentTime?.from || "N/A"}
-                </Text>
-              </View>
-              
-              <View style={styles.detailItem}>
-                <Ionicons name="medkit-outline" size={16} color={COLORS.textSecondary} />
-                <Text style={styles.detailText} numberOfLines={1}>
-                  {item.doctor?.fullName || "Not assigned"}
-                </Text>
-              </View>
-              
-              <View style={styles.detailItem}>
-                <Ionicons name="cash-outline" size={16} color={COLORS.textSecondary} />
-                <Text style={styles.detailText}>Rs.{item.fee || 0}</Text>
-              </View>
-            </View>
-            
-            <View style={styles.cardActions}>
-              <TouchableOpacity
-                style={[styles.actionButton, styles.tokenButton]}
-                onPress={() => handleViewToken(item._id)}
-              >
-                <Ionicons name="qr-code-outline" size={14} color="white" />
-                <Text style={styles.buttonText}>Token</Text>
-              </TouchableOpacity>
-              
-              {!item.isApmtCanceled && !item.isPrescriptionCreated && (
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => handleCancelAppointment(item._id)}
-                >
-                  <Ionicons name="close-circle" size={14} color="white" />
-                  <Text style={styles.buttonText}>Cancel</Text>
-                </TouchableOpacity>
-              )}
-              
-              <TouchableOpacity
-                style={[styles.actionButton, styles.retakeButton]}
-                onPress={() => handleRetakeAppointment(item)}
-              >
-                <Ionicons name="repeat" size={14} color="white" />
-                <Text style={styles.buttonText}>Retake</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Card>
+        style={[
+          { opacity: animations.fadeAnim, transform: [{ translateY: animations.translateY }] }
+        ]}
+      >
+        <AppointmentCard
+          appointment={{
+            _id: item._id,
+            patientId: {
+              patientName: item.patientId?.patientName || "Unknown",
+              mrn: item.patientId?.mrn || "N/A"
+            },
+            doctor: {
+              fullName: item.doctor?.fullName || "Not assigned"
+            },
+            appointmentDate: item.appointmentDate,
+            slot: item.appointmentTime?.from || "N/A",
+            isCanceled: item.isApmtCanceled,
+            isPrescriptionCreated: item.isPrescriptionCreated,
+            isChecked: item.isPrescriptionCreated
+          }}
+          onRetake={() => handleRetakeAppointment(item)}
+          onToken={() => handleViewToken(item._id)}
+          onCancel={() => handleCancelAppointment(item._id)}
+          onPrintData={handlePrintData}
+        />
         <InstructionModal 
-      visible={instructionsVisible}
-      onClose={() => setInstructionsVisible(false)}
-      navigateToAppointment={handleNavigateToAppointment}
-      navigateToPatients={handleNavigateToPatients}
-    />
+          visible={instructionsVisible}
+          onClose={() => setInstructionsVisible(false)}
+          navigateToAppointment={handleNavigateToAppointment}
+          navigateToPatients={handleNavigateToPatients}
+        />
       </Animated.View>
-     
     );
   };
-  
 
   return (
     <View style={styles.container}>

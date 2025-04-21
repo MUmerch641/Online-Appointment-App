@@ -1,4 +1,6 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+"use client"
+
+import { useEffect, useState, useCallback, useRef } from "react"
 import {
   View,
   Text,
@@ -11,93 +13,136 @@ import {
   Animated,
   StatusBar,
   SafeAreaView,
-} from "react-native";
-import {
-  useGetAllPatientsQuery,
-  useDeletePatientMutation,
-} from "../../redux/api/patientApi";
-import { Ionicons, Feather } from "@expo/vector-icons";
-import { Card } from "react-native-paper";
-import { useRouter } from "expo-router";
-import { useSelector, useDispatch } from "react-redux";
-import { selectUser } from "../../redux/slices/authSlice";
-import {
-  selectPatients,
-  setPatients,
-  removePatient,
-} from "../../redux/slices/patientSlice";
-import { useFocusEffect } from "@react-navigation/native"; 
-import { COLORS } from "@/constants/Colors";
-
-
+} from "react-native"
+import { useGetAllPatientsQuery, useDeletePatientMutation } from "../../redux/api/patientApi"
+import { Ionicons, Feather } from "@expo/vector-icons"
+import { Card } from "react-native-paper"
+import { useRouter } from "expo-router"
+import { useSelector, useDispatch } from "react-redux"
+import { selectUser } from "../../redux/slices/authSlice"
+import { selectPatients, setPatients, removePatient } from "../../redux/slices/patientSlice"
+import { useFocusEffect } from "@react-navigation/native"
+import { COLORS } from "@/constants/Colors"
 
 interface Patient {
-  _id: string;
-  patientName: string;
-  guardiansName: string;
-  gender: string;
-  dob: string;
-  phonNumber: string;
-  cnic: string;
-  healthId?: string;
-  city: string;
-  reference?: string;
-  projectId?: string;
-  mrn?: number;
+  _id: string
+  patientName: string
+  guardiansName: string
+  gender: string
+  dob: string
+  phoneNumber?: string // Correct property name
+  phonNumber?: string // Include legacy property name for backward compatibility
+  cnic: string
+  healthId?: string
+  city: string
+  reference?: string
+  projectId?: string
+  mrn?: number
 }
 
 const PatientsScreen = () => {
-  const router = useRouter();
-  const dispatch = useDispatch();
-  const user = useSelector(selectUser);
-  const projectId = user?.projectId ?? "";
-  const searchAnimation = useRef(new Animated.Value(0)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const headerAnimation = useRef(new Animated.Value(0)).current;
-  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
-  const searchInputRef = useRef(null);
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const router = useRouter()
+  const dispatch = useDispatch()
+  const user = useSelector(selectUser)
+  const projectId = user?.projectId ?? ""
+  const searchAnimation = useRef(new Animated.Value(0)).current
+  const fadeAnim = useRef(new Animated.Value(0)).current
+  const headerAnimation = useRef(new Animated.Value(0)).current
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false)
+  const searchInputRef = useRef<TextInput | null>(null)
+  const [isSearchFocused, setIsSearchFocused] = useState(false)
 
-  const { data: fetchedPatients, isLoading, refetch } = useGetAllPatientsQuery(undefined, {
-    refetchOnFocus: false, 
+  const {
+    data: fetchedPatients,
+    isLoading,
+    refetch,
+    error,
+  } = useGetAllPatientsQuery(undefined, {
+    refetchOnFocus: true, // Changed to true for better reloading on screen focus
     refetchOnReconnect: true,
-  });
+    refetchOnMountOrArgChange: true, // Added for better reload behavior
+  })
 
-  const [deletePatient] = useDeletePatientMutation();
-  const patients = useSelector(selectPatients);
-  const [searchKeyword, setSearchKeyword] = useState("");
-  const [expandedCard, setExpandedCard] = useState(null);
-  const listItemAnimations = useRef([]);
+  const [deletePatient, { isLoading: isDeleting }] = useDeletePatientMutation()
+  const patients = useSelector(selectPatients)
+  const [searchKeyword, setSearchKeyword] = useState("")
+  const listItemAnimations = useRef<Animated.Value[]>([])
+
+  const calculateAge = (dob: string) => {
+    if (!dob) return "N/A"
+
+    try {
+      const birthDate = new Date(dob)
+      const today = new Date()
+      let age = today.getFullYear() - birthDate.getFullYear()
+      const monthDiff = today.getMonth() - birthDate.getMonth()
+
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--
+      }
+
+      return age.toString()
+    } catch (e) {
+      return "N/A"
+    }
+  }
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "N/A"
+
+    try {
+      const date = new Date(dateString)
+      return date
+        .toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        })
+        .replace(/\//g, "/")
+    } catch (e) {
+      return dateString
+    }
+  }
+
+  useEffect(() => {
+    refetch()
+  }, [])
 
   useEffect(() => {
     if (fetchedPatients?.data) {
-      dispatch(setPatients(fetchedPatients.data));
-      
-      // Create animation values for each item
-      if (fetchedPatients.data.length > 0) {
-        listItemAnimations.current = fetchedPatients.data.map(() => new Animated.Value(0));
+      // Map API response to correct property names if needed
+      const mappedPatients = fetchedPatients.data.map((patient: Patient & { phonNumber?: string }) => ({
+        ...patient,
+        // Ensure phoneNumber exists even if API returns phonNumber
+        phoneNumber: patient.phoneNumber || patient.phonNumber,
+      }))
+
+      dispatch(setPatients(mappedPatients))
+
+      if (mappedPatients.length > 0) {
+        listItemAnimations.current = mappedPatients.map(() => new Animated.Value(0))
       }
     }
-  }, [fetchedPatients, dispatch]);
+  }, [fetchedPatients, dispatch])
 
   useEffect(() => {
     if (patients && patients.length > 0 && listItemAnimations.current.length > 0) {
       Animated.stagger(
         50,
-        listItemAnimations.current.map(anim =>
+        listItemAnimations.current.map((anim) =>
           Animated.timing(anim, {
             toValue: 1,
             duration: 300,
             useNativeDriver: true,
-          })
-        )
-      ).start();
+          }),
+        ),
+      ).start()
     }
-  }, [patients]);
+  }, [patients])
 
   useFocusEffect(
     useCallback(() => {
-      refetch();
+      refetch().catch((err) => console.error("Failed to fetch patients:", err))
 
       Animated.parallel([
         Animated.timing(fadeAnim, {
@@ -109,39 +154,38 @@ const PatientsScreen = () => {
           toValue: 1,
           duration: 400,
           useNativeDriver: true,
-        })
-      ]).start();
-      
-      return () => {
-        fadeAnim.setValue(0);
-        headerAnimation.setValue(0);
-      };
-    }, [refetch, fadeAnim, headerAnimation])
-  );
+        }),
+      ]).start()
 
-  const filteredPatients = patients?.filter(
-    (patient: Patient) =>
-      patient.projectId === projectId &&
-      (!searchKeyword ||
-        patient.patientName.toLowerCase().includes(searchKeyword.toLowerCase()) ||
-        patient.cnic.includes(searchKeyword) ||
-        patient.phonNumber.includes(searchKeyword) ||
-        String(patient.mrn ?? "").includes(searchKeyword))
-  ) || [];
+      return () => {
+        fadeAnim.setValue(0)
+        headerAnimation.setValue(0)
+      }
+    }, [refetch, fadeAnim, headerAnimation]),
+  )
+
+  const filteredPatients =
+    patients?.filter(
+      (patient: Patient) =>
+        patient.projectId === projectId &&
+        (!searchKeyword ||
+          patient.patientName.toLowerCase().includes(searchKeyword.toLowerCase()) ||
+          patient.cnic.includes(searchKeyword) ||
+          ((patient.phoneNumber?.includes(searchKeyword) || patient.phonNumber?.includes(searchKeyword)) ?? false) ||
+          String(patient.mrn ?? "").includes(searchKeyword)),
+    ) || []
 
   const handleUpdate = (patient: Patient) => {
-
     if (!patient || !patient._id) {
-      Alert.alert("Error", "Invalid patient data.");
-      return;
+      Alert.alert("Error", "Invalid patient data.")
+      return
     }
-
 
     router.push({
       pathname: "/registration/PatientUpdate",
       params: { patientData: JSON.stringify(patient) },
-    });
-  };
+    })
+  }
 
   const handleDelete = async (id: string) => {
     Alert.alert("Confirm Delete", "Are you sure you want to delete this patient?", [
@@ -150,38 +194,38 @@ const PatientsScreen = () => {
         text: "Delete",
         onPress: async () => {
           try {
-            await deletePatient(id).unwrap();
-            dispatch(removePatient(id)); 
-            Alert.alert("Deleted", "Patient deleted successfully.");
-            refetch();
+            await deletePatient(id).unwrap()
+            dispatch(removePatient(id as any))
+            Alert.alert("Deleted", "Patient deleted successfully.")
+            refetch()
           } catch (error) {
-            Alert.alert("Error", "Failed to delete patient.");
+            const errorMessage = error instanceof Error ? error.message : "Unknown error"
+            Alert.alert("Error", `Failed to delete patient: ${errorMessage}`)
           }
         },
       },
-    ]);
-  };
+    ])
+  }
 
   const handleCreateAppointment = (patient: Patient) => {
-
     if (!patient || !patient._id) {
-      Alert.alert("Error", "Invalid patient data.");
-      return;
+      Alert.alert("Error", "Invalid patient data.")
+      return
     }
 
     router.push({
       pathname: "/appointments/CreateAppointmentScreen",
       params: { patientId: patient._id },
-    });
-  };
+    })
+  }
 
   const handleGoBack = () => {
-    router.back();
-  };
+    router.back()
+  }
 
   const toggleSearch = () => {
-    const toValue = isSearchExpanded ? 0 : 1;
-    
+    const toValue = isSearchExpanded ? 0 : 1
+
     Animated.spring(searchAnimation, {
       toValue,
       friction: 8,
@@ -189,139 +233,144 @@ const PatientsScreen = () => {
       useNativeDriver: false,
     }).start(() => {
       if (!isSearchExpanded) {
-        searchInputRef.current?.focus();
+        searchInputRef.current?.focus()
       } else {
-        setSearchKeyword("");
+        setSearchKeyword("")
       }
-    });
-    
-    setIsSearchExpanded(!isSearchExpanded);
-  };
+    })
+
+    setIsSearchExpanded(!isSearchExpanded)
+  }
 
   const clearSearch = () => {
-    setSearchKeyword("");
-    searchInputRef.current?.focus();
-  };
+    setSearchKeyword("")
+    searchInputRef.current?.focus()
+  }
 
   const searchWidth = searchAnimation.interpolate({
     inputRange: [0, 1],
     outputRange: ["15%", "85%"],
-  });
+  })
 
   const iconOpacity = searchAnimation.interpolate({
     inputRange: [0, 1],
     outputRange: [1, 0.2],
-  });
+  })
 
   const headerTranslateY = headerAnimation.interpolate({
     inputRange: [0, 1],
     outputRange: [-50, 0],
-  });
+  })
 
   const headerOpacity = headerAnimation.interpolate({
     inputRange: [0, 1],
     outputRange: [0, 1],
-  });
+  })
 
-  const toggleCardExpansion = (id) => {
-    setExpandedCard(expandedCard === id ? null : id);
-  };
+  const renderPatientCard = ({ item, index }: { item: Patient; index: number }) => {
+    const itemAnimation = listItemAnimations.current[index] || new Animated.Value(1)
 
-  const renderPatientCard = ({ item, index }) => {
-    const isExpanded = expandedCard === item._id;
-    const itemAnimation = listItemAnimations.current[index] || new Animated.Value(1);
-    
     const translateY = itemAnimation.interpolate({
       inputRange: [0, 1],
       outputRange: [50, 0],
-    });
-    
+    })
+
     const opacity = itemAnimation.interpolate({
       inputRange: [0, 1],
       outputRange: [0, 1],
-    });
+    })
+
+    // Extract phone number from either property
+    const phoneNumber = item.phoneNumber || item.phonNumber || "N/A"
 
     return (
       <Animated.View style={{ opacity, transform: [{ translateY }] }}>
         <Card style={styles.card}>
-          <TouchableOpacity onPress={() => toggleCardExpansion(item._id)} activeOpacity={0.7}>
-            <View style={styles.headerContainer}>
-              <View style={styles.nameContainer}>
-                <Text style={styles.patientName}>{item.patientName}</Text>
-                <Text style={styles.mrnText}>MRN: {item.mrn}</Text>
-              </View>
-              <View style={styles.actionIcons}>
-                <TouchableOpacity onPress={() => handleUpdate(item)}>
-                  <Ionicons name="create-outline" size={22} color={COLORS.primary} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleDelete(item._id)}>
-                  <Ionicons name="trash-outline" size={20} color={COLORS.danger} />
-                </TouchableOpacity>
-                <Ionicons 
-                  name={isExpanded ? "chevron-up" : "chevron-down"} 
-                  size={18} 
-                  color={COLORS.textSecondary} 
-                />
-              </View>
+          <View style={styles.patientHeader}>
+            <Text style={styles.patientName}>{item.patientName}</Text>
+            <Text style={styles.patientMeta}>
+              Age: {calculateAge(item.dob)} MRN: {item.mrn || "N/A"}
+            </Text>
+          </View>
+
+          <View style={styles.infoContainer}>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Father Name:</Text>
+              <Text style={styles.infoValue}>{item.guardiansName}</Text>
             </View>
-            
-            {!isExpanded ? (
-              <View style={styles.compactInfoContainer}>
-                <Text style={styles.compactInfo}>
-                  <Ionicons name="call-outline" size={14} color={COLORS.textSecondary} /> {item.phonNumber}
-                </Text>
-                <Text style={styles.compactInfo}>
-                  <Ionicons name="person-outline" size={14} color={COLORS.textSecondary} /> {item.gender}
-                </Text>
-              </View>
-            ) : (
-              <Animated.View>
-                <View style={styles.detailsContainer}>
-                  <View style={styles.detailColumn}>
-                    <Text style={styles.label}>Guardian: <Text style={styles.value}>{item.guardiansName}</Text></Text>
-                    <Text style={styles.label}>DoB: <Text style={styles.value}>{item.dob}</Text></Text>
-                    <Text style={styles.label}>Phone: <Text style={styles.value}>{item.phonNumber}</Text></Text>
-                  </View>
-                  <View style={styles.detailColumn}>
-                    <Text style={styles.label}>Gender: <Text style={styles.value}>{item.gender}</Text></Text>
-                    <Text style={styles.label}>City: <Text style={styles.value}>{item.city}</Text></Text>
-                    <Text style={styles.label}>CNIC: <Text style={styles.value}>{item.cnic}</Text></Text>
-                  </View>
-                </View>
-                <TouchableOpacity 
-                  style={styles.appointmentButton} 
-                  onPress={() => handleCreateAppointment(item)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.appointmentText}>Create Appointment</Text>
-                </TouchableOpacity>
-              </Animated.View>
-            )}
-          </TouchableOpacity>
+
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Phone Number:</Text>
+              <Text style={styles.infoValue}>{phoneNumber}</Text>
+            </View>
+
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>DOB:</Text>
+              <Text style={styles.infoValue}>{formatDate(item.dob)}</Text>
+            </View>
+
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Gender:</Text>
+              <Text style={styles.infoValue}>{item.gender}</Text>
+            </View>
+          </View>
+
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => handleCreateAppointment(item)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="repeat-outline"  size={16} color={'#4CAF50'} />
+              <Text style={styles.buttonText}>Retake Appointment</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionButton, styles.editButton]}
+              onPress={() => handleUpdate(item)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="create-outline" size={16} color={'grey'} />
+              <Text style={styles.buttonTextE}>Edit Patient</Text>
+            </TouchableOpacity>
+          </View>
         </Card>
       </Animated.View>
-    );
-  };
+    )
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+        <View style={styles.container}>
+          <View style={styles.emptyContainer}>
+            <Ionicons name="alert-circle-outline" size={64} color={COLORS.danger} />
+            <Text style={[styles.emptyText, { color: COLORS.danger }]}>Error loading patients</Text>
+            <Text style={styles.emptySubtext}>Something went wrong. Please try again.</Text>
+            <TouchableOpacity style={[styles.appointmentButton, { marginTop: 20 }]} onPress={() => refetch()}>
+              <Text style={styles.appointmentText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    )
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
-      
-     
-      <Animated.View 
+
+      <Animated.View
         style={[
           styles.header,
-          { 
-            opacity: headerOpacity, 
-            transform: [{ translateY: headerTranslateY }] 
-          }
+          {
+            opacity: headerOpacity,
+            transform: [{ translateY: headerTranslateY }],
+          },
         ]}
       >
-        <TouchableOpacity 
-          style={styles.backButton} 
-          onPress={handleGoBack}
-          activeOpacity={0.7}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={handleGoBack} activeOpacity={0.7}>
           <Ionicons name="chevron-back" size={24} color={COLORS.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Patients</Text>
@@ -352,14 +401,10 @@ const PatientsScreen = () => {
               )}
             </View>
           </Animated.View>
-          
+
           <TouchableOpacity onPress={toggleSearch} style={styles.searchButton}>
             <Animated.View style={{ opacity: iconOpacity }}>
-              <Ionicons 
-                name={isSearchExpanded ? "close" : "search"} 
-                size={24} 
-                color={COLORS.primary} 
-              />
+              <Ionicons name={isSearchExpanded ? "close" : "search"} size={24} color={COLORS.primary} />
             </Animated.View>
           </TouchableOpacity>
         </View>
@@ -392,8 +437,8 @@ const PatientsScreen = () => {
         )}
       </View>
     </SafeAreaView>
-  );
-};
+  )
+}
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -410,6 +455,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.lightGray,
   },
+  appointmentButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  appointmentText: {
+    color: COLORS.cardBackground,
+    fontSize: 16,
+    fontWeight: "600",
+  },
   backButton: {
     padding: 8,
     borderRadius: 20,
@@ -418,7 +476,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 2,
   },
   headerTitle: {
     fontSize: 18,
@@ -426,7 +483,7 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
   },
   headerRight: {
-    width: 40, 
+    width: 40,
   },
   container: {
     flex: 1,
@@ -452,7 +509,7 @@ const styles = StyleSheet.create({
     height: 48,
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
+    borderColor: "rgba(0,0,0,0.05)",
   },
   searchInputWrapper: {
     flexDirection: "row",
@@ -486,7 +543,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
+    borderColor: "rgba(0,0,0,0.05)",
   },
   loaderContainer: {
     flex: 1,
@@ -506,87 +563,77 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cardBackground,
     borderRadius: 12,
     marginBottom: 12,
-    elevation: 3, 
-    shadowColor: "#000", 
+    elevation: 3,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  headerContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 4,
+  patientHeader: {
+    marginBottom: 12,
   },
-  nameContainer: {
-    flex: 1,
+  patientMeta: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginTop: 2,
   },
   patientName: {
     fontSize: 16,
     fontWeight: "bold",
     color: COLORS.textPrimary,
   },
-  actionIcons: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
+  infoContainer: {
+    marginBottom: 12,
+    backgroundColor: "#E4E4E4", // Add grey background
+    padding: 12,                // Add padding
+    borderRadius: 14,           // Add rounded corners
   },
-  mrnText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.primary,
-    marginTop: 2,
-  },
-  compactInfoContainer: {
+  infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 8,
-    paddingTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.lightGray,
+    marginBottom: 6,
   },
-  compactInfo: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  detailsContainer: {
-    flexDirection: "row",
-    marginTop: 10,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.lightGray,
-  },
-  detailColumn: {
-    flex: 1,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.textSecondary,
-    marginBottom: 4,
-  },
-  value: {
-    fontWeight: "normal",
-    color: COLORS.textPrimary,
-  },
-  appointmentButton: {
-    backgroundColor: COLORS.primary,
-    padding: 10,
-    borderRadius: 10,
-    alignItems: "center",
-    marginTop: 12,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  appointmentText: {
-    color: COLORS.cardBackground,
+  infoLabel: {
     fontSize: 14,
-    fontWeight: "bold",
+    color: COLORS.textSecondary,
+  },
+  infoValue: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: COLORS.textPrimary,
+    textAlign: "right",
+  },
+  buttonContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  actionButton: {
+    flex: 1,
+    backgroundColor: "transparent",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: "#388E3C", // Green border
+  },
+  editButton: {
+    backgroundColor: "transparent",
+    borderColor: "grey", // Grey border for edit button
+  },
+  buttonText: {
+    color: "#4CAF50", // Green text for appointment button
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  buttonTextE: {
+    color: "grey", // Green text for appointment button
+    fontSize: 11,
+    fontWeight: "600",
   },
   emptyContainer: {
     flex: 1,
@@ -607,6 +654,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingHorizontal: 32,
   },
-});
+})
 
-export default PatientsScreen;
+export default PatientsScreen

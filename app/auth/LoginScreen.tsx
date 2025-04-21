@@ -71,7 +71,7 @@ const LoginScreen = () => {
 
   useEffect(() => {
     if (user?.token) { 
-      router.replace("/dashboard/DashboardScreen");
+      router.replace("/dashboard/PatientScreen");
     }
   }, [user]);
 

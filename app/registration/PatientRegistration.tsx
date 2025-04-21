@@ -13,16 +13,15 @@ import {
   Keyboard,
 } from "react-native";
 import { skipToken } from "@reduxjs/toolkit/query";
-import DateTimePicker from "@react-native-community/datetimepicker";
 import { Card, RadioButton } from "react-native-paper";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useDispatch, useSelector } from "react-redux";
-import { 
-  useRegisterPatientMutation, 
-  useGetAllPatientsQuery, 
-  useSearchPatientByMRNQuery 
-} from "../../redux/api/patientApi"; 
+import {
+  useRegisterPatientMutation,
+  useGetAllPatientsQuery,
+  useSearchPatientByMRNQuery
+} from "../../redux/api/patientApi";
 import { selectUser } from "../../redux/slices/authSlice";
 import { addPatients, setPatients } from "../../redux/slices/patientSlice";
 import { COLORS } from "@/constants/Colors";
@@ -31,7 +30,6 @@ import { COLORS } from "@/constants/Colors";
 
 const PatientRegistration = () => {
   const [dob, setDob] = useState("");
-  const [showPicker, setShowPicker] = useState(false);
   const [age, setAge] = useState({ years: 0, months: 0, days: 0 });
   const [gender, setGender] = useState("Male");
   const [patientName, setPatientName] = useState("");
@@ -41,26 +39,26 @@ const PatientRegistration = () => {
   const [healthId, setHealthId] = useState("");
   const [city, setCity] = useState("");
   const [reference, setReference] = useState("");
-  const [mrn, setMrn] = useState<string>(""); 
+  const [mrn, setMrn] = useState<string>("");
   const [searchedPatientData, setSearchedPatientData] = useState<any>(null);
   const [searchedMRN, setSearchedMRN] = useState<string | null>(null);
-  
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const spinAnim = useRef(new Animated.Value(0)).current;
   const searchButtonScale = useRef(new Animated.Value(1)).current;
   const submitButtonAnim = useRef(new Animated.Value(1)).current;
-  
+
   const router = useRouter();
   const dispatch = useDispatch();
   const user = useSelector(selectUser);
-  const projectId = user?.projectId ?? ""; 
-  const [registerPatient] = useRegisterPatientMutation();  
+  const projectId = user?.projectId ?? "";
+  const [registerPatient] = useRegisterPatientMutation();
   const { data: allPatients, refetch } = useGetAllPatientsQuery();
 
   const { data: searchedPatient, error, isFetching } = useSearchPatientByMRNQuery(
-    searchedMRN ?? skipToken 
+    searchedMRN ?? skipToken
   );
 
   useEffect(() => {
@@ -76,7 +74,7 @@ const PatientRegistration = () => {
         useNativeDriver: true,
       }),
     ]).start();
-    
+
     Animated.loop(
       Animated.timing(spinAnim, {
         toValue: 1,
@@ -92,105 +90,14 @@ const PatientRegistration = () => {
 
   useEffect(() => {
     refetch();
-  }, []);  
+  }, []);
 
-  useEffect(() => {
-    if (dob) { 
-      setAge(calculateAge(dob));
-    }
-  }, [dob]);
+  const handleDateChange = (text: string) => {
+    setDob(text);
 
-  const handleMRNSearch = () => {
-    if (!mrn.trim()) {
-      Animated.sequence([
-        Animated.timing(shakeAnim, { toValue: 10, duration: 100, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: -10, duration: 100, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: 10, duration: 100, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: 0, duration: 100, useNativeDriver: true })
-      ]).start();
-      
-      Alert.alert("Error", "Please enter a valid MRN.");
-      return;
-    }
-
-    
-    Animated.sequence([
-      Animated.timing(searchButtonScale, {
-        toValue: 0.9,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(searchButtonScale, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    setSearchedMRN(mrn); 
-  };
-
-  useEffect(() => {
-    if (isFetching) {
-      console.log("⏳ Fetching patient data...");
-    }
-  
-    if (searchedPatient?.isSuccess && searchedPatient.data?.length > 0) {
-      console.log("✅ Found Patient Data:", searchedPatient.data[0]);
-      
-      Animated.sequence([
-        Animated.timing(fadeAnim, {
-          toValue: 0.7,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start();
-  
-      setSearchedPatientData(searchedPatient.data[0]);
-    } else if (searchedMRN && !isFetching) {
-      Alert.alert("No Patient Found", "No patient found with this MRN.");
-    }
-  }, [searchedPatient, isFetching]);
-  
-  useEffect(() => {
-  
-    if (searchedPatientData) {
-      console.log("📝 Updating Form Fields with Data...");
-  
-      setPatientName(searchedPatientData.patientName || "");
-      setGuardiansName(searchedPatientData.guardiansName || "");
-      setGender(searchedPatientData.gender || "Male");
-      setDob(searchedPatientData.dob || "");
-      setPhoneNumber(searchedPatientData.phonNumber || "");
-      setCnic(searchedPatientData.cnic || "");
-      setHealthId(searchedPatientData.helthId || "");
-      setCity(searchedPatientData.city || "");
-      setReference(searchedPatientData.reference || "");
-    }
-  
-  }, [searchedPatientData]);
-  
-  useEffect(() => {
-    if (error) {
-      Alert.alert("API Error", "Something went wrong. Please try again.");
-    }
-  }, [error]);
-
-  useEffect(() => {
-    if (allPatients?.data) {
-      dispatch(setPatients(allPatients.data)); 
-    }
-  }, [allPatients]);
-
-  const handleDateChange = (_: unknown, selectedDate?: Date) => { 
-    setShowPicker(false);
-    if (selectedDate) {
-      setDob(selectedDate.toISOString().split("T")[0]);
+    // Only calculate age if the input matches YYYY-MM-DD format
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+      setAge(calculateAge(text));
     }
   };
 
@@ -213,10 +120,97 @@ const PatientRegistration = () => {
 
     return { years, months, days };
   };
-  
+
+  const handleMRNSearch = () => {
+    if (!mrn.trim()) {
+      Animated.sequence([
+        Animated.timing(shakeAnim, { toValue: 10, duration: 100, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -10, duration: 100, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 10, duration: 100, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 0, duration: 100, useNativeDriver: true })
+      ]).start();
+
+      Alert.alert("Error", "Please enter a valid MRN.");
+      return;
+    }
+
+
+    Animated.sequence([
+      Animated.timing(searchButtonScale, {
+        toValue: 0.9,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(searchButtonScale, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    setSearchedMRN(mrn);
+  };
+
+  useEffect(() => {
+    if (isFetching) {
+      console.log("⏳ Fetching patient data...");
+    }
+
+    if (searchedPatient?.isSuccess && searchedPatient.data?.length > 0) {
+      console.log("✅ Found Patient Data:", searchedPatient.data[0]);
+
+      Animated.sequence([
+        Animated.timing(fadeAnim, {
+          toValue: 0.7,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      setSearchedPatientData(searchedPatient.data[0]);
+    } else if (searchedMRN && !isFetching) {
+      Alert.alert("No Patient Found", "No patient found with this MRN.");
+    }
+  }, [searchedPatient, isFetching]);
+
+  useEffect(() => {
+
+    if (searchedPatientData) {
+      console.log("📝 Updating Form Fields with Data...");
+
+      setPatientName(searchedPatientData.patientName || "");
+      setGuardiansName(searchedPatientData.guardiansName || "");
+      setGender(searchedPatientData.gender || "Male");
+      setDob(searchedPatientData.dob || "");
+      setPhoneNumber(searchedPatientData.phonNumber || "");
+      setCnic(searchedPatientData.cnic || "");
+      setHealthId(searchedPatientData.helthId || "");
+      setCity(searchedPatientData.city || "");
+      setReference(searchedPatientData.reference || "");
+    }
+
+  }, [searchedPatientData]);
+
+  useEffect(() => {
+    if (error) {
+      Alert.alert("API Error", "Something went wrong. Please try again.");
+    }
+  }, [error]);
+
+  useEffect(() => {
+    if (allPatients?.data) {
+      dispatch(setPatients(allPatients.data));
+    }
+  }, [allPatients]);
   const handleSubmit = async () => {
+    console.log("first")
     Keyboard.dismiss();
-    
+
     Animated.sequence([
       Animated.timing(submitButtonAnim, {
         toValue: 0.95,
@@ -229,25 +223,53 @@ const PatientRegistration = () => {
         useNativeDriver: true,
       }),
     ]).start();
-    
+    console.log("2")
+
+    // Check if required fields are filled
     if (!patientName || !guardiansName || !phoneNumber || !city) {
       Animated.sequence([
         Animated.timing(shakeAnim, { toValue: 10, duration: 100, useNativeDriver: true }),
         Animated.timing(shakeAnim, { toValue: -10, duration: 100, useNativeDriver: true }),
         Animated.timing(shakeAnim, { toValue: 10, duration: 100, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: 0, duration: 100, useNativeDriver: true })
+        Animated.timing(shakeAnim, { toValue: 0, duration: 100, useNativeDriver: true }),
       ]).start();
-      
+
       Alert.alert("Error", "Please fill in all required fields.");
       return;
     }
+    console.log("3")
 
+    // Validate phone number
     const phonePattern = /^(03\d{9}|\+92\d{10})$/;
     if (!phonePattern.test(phoneNumber)) {
-      Alert.alert("Error", "Invalid Pakistani phone number. Format: 03XXXXXXXXX or +92XXXXXXXXXX");
+      Alert.alert(
+        "Error",
+        "Invalid Pakistani phone number. Format: 03XXXXXXXXX or +92XXXXXXXXXX"
+      );
+      return;
+    }
+    console.log("4")
+
+    // Validate date format
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    if (dob && !datePattern.test(dob)) {
+      Alert.alert("Error", "Date of birth must be in the format YYYY-MM-DD");
       return;
     }
 
+    // If searchedPatientData exists, skip registration and navigate to appointment
+    if (searchedPatientData) {
+      Alert.alert("Success", "Existing patient selected. Proceeding to appointment.");
+      router.push({
+        pathname: "/appointments/CreateAppointmentScreen",
+        params: {
+          patientId: searchedPatientData._id, patientName: searchedPatientData.patientName,
+          mrn: searchedPatientData.mrn,        },
+      });
+      return;
+    }
+
+    // Proceed with registration for new patient
     const patientData = {
       patientName,
       guardiansName,
@@ -285,14 +307,13 @@ const PatientRegistration = () => {
       }
     }
   };
-
   const spin = spinAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg']
   });
 
   return (
-    <Animated.View 
+    <Animated.View
       style={[
         styles.container,
         {
@@ -302,15 +323,15 @@ const PatientRegistration = () => {
       ]}
     >
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => router.back()}
           style={styles.backButton}
         >
-        <Ionicons name="chevron-back" size={20} color={COLORS.primary} />
+          <Ionicons name="chevron-back" size={20} color={COLORS.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Registration</Text>
 
-        <Animated.View 
+        <Animated.View
           style={[
             styles.searchContainer,
             { transform: [{ translateX: shakeAnim }] }
@@ -322,7 +343,7 @@ const PatientRegistration = () => {
             placeholderTextColor={COLORS.placeholder}
             value={mrn}
             onChangeText={(text) => {
-              if (/^\d*$/.test(text)) {  
+              if (/^\d*$/.test(text)) {
                 setMrn(text);
               }
             }}
@@ -344,38 +365,38 @@ const PatientRegistration = () => {
           </Animated.View>
         </Animated.View>
       </View>
-      
-      <ScrollView 
+
+      <ScrollView
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
         <Card style={styles.card}>
           <View style={styles.formContainer}>
             <Text style={styles.sectionTitle}>Personal Information</Text>
-            
+
             <Text style={styles.label}>Patient Name:</Text>
-            <TextInput 
-              style={styles.input} 
-              placeholder='Enter Name' 
+            <TextInput
+              style={styles.input}
+              placeholder='Enter Name'
               placeholderTextColor={COLORS.placeholder}
-              value={patientName} 
-              onChangeText={setPatientName} 
+              value={patientName}
+              onChangeText={setPatientName}
             />
 
             <Text style={styles.label}>Guardian Name:</Text>
-            <TextInput 
-              style={styles.input} 
-              placeholder='Enter Name' 
+            <TextInput
+              style={styles.input}
+              placeholder='Enter Name'
               placeholderTextColor={COLORS.placeholder}
-              value={guardiansName} 
-              onChangeText={setGuardiansName} 
+              value={guardiansName}
+              onChangeText={setGuardiansName}
             />
 
             <Text style={styles.label}>Gender:</Text>
             <View style={styles.genderContainer}>
               {["Male", "Female", "Child"].map((option) => (
-                <TouchableOpacity 
-                  key={option} 
+                <TouchableOpacity
+                  key={option}
                   style={[
                     styles.genderButton,
                     gender === option && styles.genderButtonSelected
@@ -401,30 +422,15 @@ const PatientRegistration = () => {
             <Text style={styles.sectionTitle}>Date & Age</Text>
 
             <Text style={styles.label}>Date of Birth:</Text>
-            <TouchableOpacity 
-              onPress={() => setShowPicker(true)}
-              style={styles.datePickerButton}
-              activeOpacity={0.7}
-            >
-              <TextInput
-                style={styles.dateInput}
-                placeholder='Select DOB'
-                placeholderTextColor={COLORS.placeholder}
-                value={dob}
-                editable={false}
-              />
-              <Ionicons name='calendar' size={20} color={COLORS.primary} />
-            </TouchableOpacity>
+            <TextInput
+              style={styles.input}
+              placeholder='Enter DOB (YYYY-MM-DD)'
+              placeholderTextColor={COLORS.placeholder}
+              value={dob}
+              onChangeText={handleDateChange}
+              keyboardType="numeric"
+            />
 
-            {showPicker && (
-              <DateTimePicker
-                value={dob ? new Date(dob) : new Date()}
-                mode='date'
-                display={Platform.OS === "ios" ? "spinner" : "default"}
-                onChange={handleDateChange}
-              />
-            )}
-            
             <Text style={styles.label}>Age:</Text>
             <View style={styles.ageContainer}>
               <View style={styles.ageBox}>
@@ -454,7 +460,7 @@ const PatientRegistration = () => {
             </View>
 
             <Text style={styles.sectionTitle}>Contact Information</Text>
-            
+
             <Text style={styles.label}>Phone Number:</Text>
             <TextInput
               style={styles.input}
@@ -487,31 +493,31 @@ const PatientRegistration = () => {
             <Text style={styles.sectionTitle}>Location & Reference</Text>
 
             <Text style={styles.label}>City:</Text>
-            <TextInput 
-              style={styles.input} 
-              placeholder='Enter City Name' 
+            <TextInput
+              style={styles.input}
+              placeholder='Enter City Name'
               placeholderTextColor={COLORS.placeholder}
               value={city}
-              onChangeText={setCity} 
+              onChangeText={setCity}
             />
 
             <Text style={styles.label}>Reference (optional):</Text>
-            <TextInput 
-              style={styles.input} 
+            <TextInput
+              style={styles.input}
               placeholder='Enter Reference'
-              placeholderTextColor={COLORS.placeholder} 
+              placeholderTextColor={COLORS.placeholder}
               value={reference}
-              onChangeText={setReference} 
+              onChangeText={setReference}
             />
           </View>
 
-          <Animated.View 
-            style={{ 
+          <Animated.View
+            style={{
               transform: [{ scale: submitButtonAnim }]
             }}
           >
-            <TouchableOpacity 
-              style={styles.submitButton} 
+            <TouchableOpacity
+              style={styles.submitButton}
               onPress={handleSubmit}
               activeOpacity={0.8}
             >
@@ -559,7 +565,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 2,  },
+    elevation: 2,
+  },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",

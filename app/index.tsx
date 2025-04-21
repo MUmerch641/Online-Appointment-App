@@ -5,8 +5,8 @@ import LottieView from "lottie-react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "@/constants/Colors";
-
-
+import { useSelector } from "react-redux";
+import { selectUser } from "@/redux/slices/authSlice";
 
 const { width } = Dimensions.get("window");
 
@@ -25,6 +25,8 @@ const Welcome = () => {
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
   const quoteAnim = useRef(new Animated.Value(0)).current;
   const [currentQuote, setCurrentQuote] = useState(0);
+  const [isMounted, setIsMounted] = useState(false);
+  const user = useSelector(selectUser);
 
   useEffect(() => {
     Animated.parallel([
@@ -54,7 +56,7 @@ const Welcome = () => {
 
     const quoteInterval = setInterval(() => {
       setCurrentQuote((prev) => (prev + 1) % healthQuotes.length);
-      
+
       Animated.sequence([
         Animated.timing(quoteAnim, {
           toValue: 0,
@@ -71,6 +73,16 @@ const Welcome = () => {
 
     return () => clearInterval(quoteInterval);
   }, []);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (user?.token && isMounted) {
+      router.replace("/dashboard/DashboardScreen");
+    }
+  }, [user, isMounted]);
 
   return (
     <LinearGradient
@@ -247,7 +259,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
-    margin:10
+    margin: 10
   },
   buttonGradient: {
     flex: 1,
