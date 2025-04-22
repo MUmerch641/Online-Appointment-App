@@ -17,6 +17,7 @@ import { Card, RadioButton } from "react-native-paper";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useDispatch, useSelector } from "react-redux";
+import DateTimePicker from '@react-native-community/datetimepicker';
 import {
   useRegisterPatientMutation,
   useGetAllPatientsQuery,
@@ -25,7 +26,6 @@ import {
 import { selectUser } from "../../redux/slices/authSlice";
 import { addPatients, setPatients } from "../../redux/slices/patientSlice";
 import { COLORS } from "@/constants/Colors";
-
 
 
 const PatientRegistration = () => {
@@ -42,6 +42,7 @@ const PatientRegistration = () => {
   const [mrn, setMrn] = useState<string>("");
   const [searchedPatientData, setSearchedPatientData] = useState<any>(null);
   const [searchedMRN, setSearchedMRN] = useState<string | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -121,6 +122,19 @@ const PatientRegistration = () => {
     return { years, months, days };
   };
 
+  const onDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      const formattedDate = selectedDate.toISOString().split('T')[0]; // YYYY-MM-DD
+      setDob(formattedDate);
+      setAge(calculateAge(formattedDate));
+    }
+  };
+
+  const showDatePickerModal = () => {
+    setShowDatePicker(true);
+  };
+
   const handleMRNSearch = () => {
     if (!mrn.trim()) {
       Animated.sequence([
@@ -186,7 +200,21 @@ const PatientRegistration = () => {
       setPatientName(searchedPatientData.patientName || "");
       setGuardiansName(searchedPatientData.guardiansName || "");
       setGender(searchedPatientData.gender || "Male");
-      setDob(searchedPatientData.dob || "");
+      
+      // Update DOB and explicitly calculate age
+      const patientDob = searchedPatientData.dob || "";
+      console.log("Patient DOB from search:", patientDob);
+      setDob(patientDob);
+      
+      // Calculate age if DOB is in valid format
+      if (patientDob && /^\d{4}-\d{2}-\d{2}$/.test(patientDob)) {
+        const calculatedAge = calculateAge(patientDob);
+        console.log("Calculated age:", calculatedAge);
+        setAge(calculatedAge);
+      } else if (patientDob) {
+        console.log("Warning: DOB format is invalid, age not calculated", patientDob);
+      }
+      
       setPhoneNumber(searchedPatientData.phonNumber || "");
       setCnic(searchedPatientData.cnic || "");
       setHealthId(searchedPatientData.helthId || "");
@@ -422,14 +450,30 @@ const PatientRegistration = () => {
             <Text style={styles.sectionTitle}>Date & Age</Text>
 
             <Text style={styles.label}>Date of Birth:</Text>
-            <TextInput
-              style={styles.input}
-              placeholder='Enter DOB (YYYY-MM-DD)'
-              placeholderTextColor={COLORS.placeholder}
-              value={dob}
-              onChangeText={handleDateChange}
-              keyboardType="numeric"
-            />
+            <TouchableOpacity 
+              style={styles.datePickerButton}
+              onPress={showDatePickerModal}
+            >
+              <Text 
+                style={[
+                  styles.dateInput, 
+                  !dob && { color: COLORS.placeholder }
+                ]}
+              >
+                {dob || 'Select Date of Birth'}
+              </Text>
+              <Ionicons name="calendar" size={20} color={COLORS.primary} />
+            </TouchableOpacity>
+
+            {showDatePicker && (
+              <DateTimePicker
+                value={dob ? new Date(dob) : new Date()}
+                mode="date"
+                display="default"
+                onChange={onDateChange}
+                maximumDate={new Date()}
+              />
+            )}
 
             <Text style={styles.label}>Age:</Text>
             <View style={styles.ageContainer}>

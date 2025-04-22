@@ -197,7 +197,15 @@ const SignupScreen = () => {
   const getInputContainerStyle = (inputName: string) => {
     return [
       styles.inputContainer,
-      activeInput === inputName && styles.activeInputContainer,
+      activeInput === inputName && {
+        transform: [{ scale: 1.02 }],
+        shadowColor: "#1F75FE",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 5,
+      },
+      // Add error style for phone number field if that's the error
       inputName === "mobileNo" && 
       errorMessage && 
       errorMessage.includes("Phone number already") && 
@@ -254,7 +262,7 @@ const SignupScreen = () => {
 
     try {
       const response: ApiResponse = await registerUser(signupData).unwrap();
-console.log(response, "Response from signup API");
+
       // Check registration response 
       const isSuccess = response.isSuccess === true && 
                      !response.message?.toLowerCase().includes("already");
@@ -348,11 +356,10 @@ console.log(response, "Response from signup API");
           >
             <Animated.View
               style={[
+                styles.formContainer,
                 {
                   opacity: formOpacity,
                   transform: [{ translateY: formTranslateY }],
-                  width: "100%",
-                  maxWidth: 450,
                 },
               ]}
             >
@@ -580,32 +587,42 @@ const styles = StyleSheet.create({
   formContainer: {
     width: "100%",
     maxWidth: 450,
-    backgroundColor: "transparent",
-    padding: 20,
-    marginVertical: 10,
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 30,
+    marginVertical: 20,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
   },
+  // Hospital info styles
   hospitalInfoContainer: {
     alignItems: "center",
-    marginBottom: 25,
-    paddingBottom: 20,
-    borderBottomWidth: 0.5,
+    marginBottom: 20,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
     borderBottomColor: "#e0e0e0",
   },
   hospitalLogo: {
     width: 120,
     height: 120,
     marginBottom: 10,
-    borderRadius: 15,
+    borderRadius: 10,
   },
   hospitalName: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "bold",
-    color: COLORS.primary,
+    color: "#1F75FE",
     textAlign: "center",
     marginBottom: 5,
   },
   hospitalPhone: {
-    fontSize: 15,
+    fontSize: 14,
     color: "#666",
     marginTop: 5,
   },
@@ -613,7 +630,7 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: COLORS.primary,
+    backgroundColor: "#1F75FE",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 10,
@@ -634,37 +651,48 @@ const styles = StyleSheet.create({
     color: "#666",
     fontSize: 14,
   },
+  // Original styles
   logoContainer: {
     alignItems: "center",
-    marginBottom: 30,
+    marginBottom: 20,
   },
   logoText: {
-    fontSize: 34,
+    fontSize: 32,
     fontWeight: "bold",
-    color: COLORS.primary,
+    color: "#1F75FE",
     letterSpacing: 2,
   },
   title: {
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: "bold",
-    color: COLORS.primary,
+    color: "#1F75FE",
+    textAlign: "center",
+    marginBottom: 5,
+  },
+  projectIdText: {
+    fontSize: 14,
+    color: "#555",
     textAlign: "center",
     marginBottom: 10,
+    backgroundColor: "#f0f4ff",
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 15,
+    alignSelf: "center",
   },
   subtitle: {
     fontSize: 16,
     color: "#666",
     textAlign: "center",
-    marginBottom: 30,
+    marginBottom: 25,
   },
   errorContainer: {
     backgroundColor: "#FFEBEE",
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 20,
-    borderWidth: 0,
-    borderLeftWidth: 4,
-    borderLeftColor: "#D32F2F",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: "#FFCDD2",
   },
   errorText: {
     color: "#D32F2F",
@@ -679,15 +707,12 @@ const styles = StyleSheet.create({
   },
   form: {
     width: "100%",
-    marginBottom: 15,
+    marginBottom: 10,
   },
   inputContainer: {
-    marginBottom: 22,
+    marginBottom: 20,
     borderRadius: 10,
-  },
-  activeInputContainer: {
-    borderColor: COLORS.primary,
-    backgroundColor: "rgba(31, 117, 254, 0.03)",
+    padding: 2,
   },
   errorInput: {
     borderWidth: 1,
@@ -707,7 +732,7 @@ const styles = StyleSheet.create({
     height: 55,
     borderWidth: 1,
     borderColor: "#e0e0e0",
-    borderRadius: 12,
+    borderRadius: 10,
     paddingHorizontal: 15,
     fontSize: 16,
     backgroundColor: "#fdfdfd",
@@ -733,25 +758,25 @@ const styles = StyleSheet.create({
   },
   forgotPassword: {
     fontSize: 15,
-    color: COLORS.primary,
+    color: "#1F75FE",
     fontWeight: "600",
   },
   signupButton: {
     width: "100%",
     backgroundColor: COLORS.primary,
-    paddingVertical: 16,
+    paddingVertical: 15,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 22,
-    shadowColor: COLORS.primary,
+    marginBottom: 20,
+    elevation: 3,
+    shadowColor: "#1F75FE",
     shadowOffset: {
       width: 0,
-      height: 3,
+      height: 2,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 5,
-    elevation: 4,
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   buttonText: {
     fontSize: 18,
@@ -770,12 +795,11 @@ const styles = StyleSheet.create({
   },
   loginText: {
     fontSize: 15,
-    color: COLORS.primary,
+    color: "#1F75FE",
     fontWeight: "bold",
   },
   bottomContainer: {
     width: "100%",
-    marginTop: 10,
   },
   noProjectContainer: {
     flex: 1,

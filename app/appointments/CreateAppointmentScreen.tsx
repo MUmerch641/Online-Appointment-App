@@ -16,7 +16,6 @@ import {
 } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import DateTimePicker from "@react-native-community/datetimepicker"
-import { Picker } from "@react-native-picker/picker"
 import { useRouter, useLocalSearchParams } from "expo-router"
 import { Card } from "react-native-paper"
 import {
@@ -26,12 +25,13 @@ import {
   useBookAppointmentMutation,
 } from "../../redux/api/appointmentApi"
 import { COLORS } from "@/constants/Colors"
+import SpecializationDropdown from "../../components/SpecializationDropdown"
 
 interface Doctor {
   _id: string
   fullName: string
   specialization: string
-  designationDetail?: string // Add this property
+  designationDetail?: string
   availableDays: string[]
   photoUrl?: string
   weeklySchedule: {
@@ -364,7 +364,7 @@ const CreateAppointmentScreen = () => {
         services: serviceId ? [serviceId] : selectedSpecializationId ? [selectedSpecializationId] : [],
         feeStatus: feeStatus,
         appointmentDate: selectedDate,
-        fee: serviceFee + 100, // Adding the additional Rs. 100 fee
+        fee: serviceFee + 100,
         extra: {},
         discount: 0,
         discountInPercentage: 0,
@@ -424,14 +424,6 @@ const CreateAppointmentScreen = () => {
         </Animated.View>
 
         <Card style={styles.card}>
-          {!showDoctorSelection && (
-            <View style={styles.backContainer}>
-              <TouchableOpacity onPress={handleBackToDoctorSelection} style={styles.backButton}>
-                <Ionicons name="chevron-back" size={24} color={COLORS.primary} />
-                <Text style={styles.backText}>Back to Doctor Selection</Text>
-              </TouchableOpacity>
-            </View>
-          )}
           <View style={styles.topSection}>
             <View style={styles.patientInfoContainer}>
               <View style={styles.infoRow}>
@@ -458,15 +450,11 @@ const CreateAppointmentScreen = () => {
             </View>
             {showDoctorSelection && (
               <View style={styles.specializationContainer}>
-                <Picker
+                <SpecializationDropdown
+                  specializations={allSpecializations}
                   selectedValue={selectedSpecialization || "All"}
                   onValueChange={(itemValue) => handleSpecializationChange(itemValue === "All" ? null : itemValue)}
-                  style={styles.picker}
-                >
-                  {allSpecializations.map((specialization) => (
-                    <Picker.Item key={specialization} label={specialization} value={specialization} />
-                  ))}
-                </Picker>
+                />
               </View>
             )}
           </View>
@@ -503,7 +491,6 @@ const CreateAppointmentScreen = () => {
                         </View>
                       </View>
 
-                      {/* Availability section moved to bottom with separator */}
                       <View style={styles.availabilityFooter}>
                         <Text style={styles.availabilityLabel}>
                           Available:{" "}
@@ -734,7 +721,6 @@ const CreateAppointmentScreen = () => {
         </Card>
       </ScrollView>
 
-      {/* Confirmation Modal */}
       <Modal visible={showConfirmModal} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
@@ -874,12 +860,6 @@ const styles = StyleSheet.create({
   },
   specializationContainer: {
     width: "35%",
-  },
-  picker: {
-    backgroundColor: "#f0f0f0",
-    borderRadius: 8,
-    color: COLORS.textPrimary,
-    height: 40,
   },
   formSection: {
     marginBottom: 24,
@@ -1209,7 +1189,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textSecondary,
   },
-  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",

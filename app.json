@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "PakHIMS",
-    "slug": "PakHIMS",
+    "slug": "pakhim",
     "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -18,7 +18,7 @@
         "origin": false
       },
       "eas": {
-        "projectId": "d4e17c46-0199-4b9b-92e9-98fa18e386f4"
+        "projectId": "5675d953-5c33-4567-85d2-b8c8a6fb6ba4"
       }
     },
     "ios": {
@@ -51,6 +51,7 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "owner": "umerkhadim"
   }
 }
