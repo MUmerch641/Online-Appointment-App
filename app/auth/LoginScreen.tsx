@@ -232,7 +232,7 @@ const LoginScreen = () => {
                     />
                   </Animatable.View>
 
-                  <Animatable.View 
+                  {/* <Animatable.View 
                     animation="fadeInUp" 
                     duration={800} 
                     delay={800} 
@@ -254,7 +254,7 @@ const LoginScreen = () => {
                     >
                       <Text style={styles.forgotPassword}>Forgot Password?</Text>
                     </TouchableOpacity>
-                  </Animatable.View>
+                  </Animatable.View> */}
                 </Animated.View>
               </View>
               
@@ -280,13 +280,13 @@ const LoginScreen = () => {
                   delay={900} 
                   style={styles.signupContainer}
                 >
-                  <Text style={styles.signupPrompt}>Don't have an account? </Text>
+                  <Text style={styles.signupPrompt}>Don't have an account?</Text>
                   <TouchableOpacity 
                     onPress={() => router.push("/auth/ScanQRScreen")}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.signupText}>Sign Up</Text>
-                  </TouchableOpacity>
+                    <Text style={styles.signupText}> Scan for Sign Up</Text>
+                    </TouchableOpacity>
                 </Animatable.View>
                 
                 {error && (

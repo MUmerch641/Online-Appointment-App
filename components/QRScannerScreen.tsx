@@ -130,30 +130,11 @@ const QRScannerScreen = () => {
           return;
         }
         
-        Alert.alert(
-          "Project ID Found",
-          `Would you like to sign up?`,
-          [
-            { 
-              text: "Cancel", 
-              style: "cancel",
-              onPress: () => {
-                setScanning(true);
-                setScanned(false);
-              }
-            },
-            { 
-              text: "Continue", 
-              style: "default",
-              onPress: () => {
-                router.push({
-                  pathname: "/auth/signup/[projectId]",
-                  params: { projectId }
-                });
-              }
-            }
-          ]
-        );
+        // Directly navigate to the signup page without showing the confirmation alert
+        router.push({
+          pathname: "/auth/signup/[projectId]",
+          params: { projectId }
+        });
         return;
       }
       

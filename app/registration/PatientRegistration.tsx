@@ -13,7 +13,7 @@ import {
   Keyboard,
 } from "react-native";
 import { skipToken } from "@reduxjs/toolkit/query";
-import { Card, RadioButton } from "react-native-paper";
+import { BottomNavigation, Card, RadioButton } from "react-native-paper";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useDispatch, useSelector } from "react-redux";
@@ -26,9 +26,12 @@ import {
 import { selectUser } from "../../redux/slices/authSlice";
 import { addPatients, setPatients } from "../../redux/slices/patientSlice";
 import { COLORS } from "@/constants/Colors";
+import { FontAwesome5 } from "@expo/vector-icons";
 
 
 const PatientRegistration = () => {
+  const [navigationIndex, setNavigationIndex] = useState(0);
+
   const [dob, setDob] = useState("");
   const [age, setAge] = useState({ years: 0, months: 0, days: 0 });
   const [gender, setGender] = useState("Male");
@@ -200,12 +203,12 @@ const PatientRegistration = () => {
       setPatientName(searchedPatientData.patientName || "");
       setGuardiansName(searchedPatientData.guardiansName || "");
       setGender(searchedPatientData.gender || "Male");
-      
+
       // Update DOB and explicitly calculate age
       const patientDob = searchedPatientData.dob || "";
       console.log("Patient DOB from search:", patientDob);
       setDob(patientDob);
-      
+
       // Calculate age if DOB is in valid format
       if (patientDob && /^\d{4}-\d{2}-\d{2}$/.test(patientDob)) {
         const calculatedAge = calculateAge(patientDob);
@@ -214,7 +217,7 @@ const PatientRegistration = () => {
       } else if (patientDob) {
         console.log("Warning: DOB format is invalid, age not calculated", patientDob);
       }
-      
+
       setPhoneNumber(searchedPatientData.phonNumber || "");
       setCnic(searchedPatientData.cnic || "");
       setHealthId(searchedPatientData.helthId || "");
@@ -292,7 +295,8 @@ const PatientRegistration = () => {
         pathname: "/appointments/CreateAppointmentScreen",
         params: {
           patientId: searchedPatientData._id, patientName: searchedPatientData.patientName,
-          mrn: searchedPatientData.mrn,        },
+          mrn: searchedPatientData.mrn,
+        },
       });
       return;
     }
@@ -450,13 +454,13 @@ const PatientRegistration = () => {
             <Text style={styles.sectionTitle}>Date & Age</Text>
 
             <Text style={styles.label}>Date of Birth:</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.datePickerButton}
               onPress={showDatePickerModal}
             >
-              <Text 
+              <Text
                 style={[
-                  styles.dateInput, 
+                  styles.dateInput,
                   !dob && { color: COLORS.placeholder }
                 ]}
               >
@@ -571,11 +575,78 @@ const PatientRegistration = () => {
           </Animated.View>
         </Card>
       </ScrollView>
+      <View style={styles.bottomNav}>
+        <BottomNavigation
+          navigationState={{
+            index: navigationIndex,
+            routes: [
+              { key: 'appointment', title: 'Appointment', icon: 'calendar-alt' },
+              { key: 'patient', title: 'Patient', icon: 'hospital-user' },
+              { key: 'profile', title: 'Profile', icon: 'user' }
+            ]
+          }}
+          onIndexChange={(index) => {
+            setNavigationIndex(index);
+            switch (index) {
+              case 0:
+                router.replace('/dashboard/DashboardScreen');
+                break;
+              case 1:
+                router.replace('/dashboard/PatientScreen');
+                break;
+              case 2:
+                router.replace('/dashboard/ProfileScreen');
+                break;
+            }
+          }}
+          renderIcon={({ route, focused }) => (
+            <FontAwesome5
+              name={route.icon}
+              size={25}
+              color={focused ? "#1F75FE" : "#666"}
+            />
+          )}
+          renderLabel={({ route, focused }) => (
+            <Text
+              style={{
+                color: focused ? "#1F75FE" : "#666",
+                fontSize: 10,
+                marginTop: -5, // Reduce this value to decrease the vertical space
+                textAlign: 'center'
+
+              }}
+            >
+              {route.title}
+            </Text>
+          )}
+          renderScene={() => null}
+          barStyle={{ backgroundColor: 'white' }}
+          activeColor="transparent"
+          inactiveColor="transparent"
+          style={{ backgroundColor: 'transparent', height: 60 }}
+          theme={{
+            colors: {
+              secondaryContainer: 'transparent'
+            }
+          }}
+          labeled={true}
+        />
+      </View>
     </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
+  bottomNav: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    elevation: 8,
+    backgroundColor: 'white',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
   container: {
     flex: 1,
     padding: 16,

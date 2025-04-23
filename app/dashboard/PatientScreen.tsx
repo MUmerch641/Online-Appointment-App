@@ -247,15 +247,8 @@ const PatientsScreen = () => {
     searchInputRef.current?.focus()
   }
 
-  const searchWidth = searchAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["15%", "85%"],
-  })
 
-  const iconOpacity = searchAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0.2],
-  })
+  
 
   const headerTranslateY = headerAnimation.interpolate({
     inputRange: [0, 1],
@@ -379,7 +372,7 @@ const PatientsScreen = () => {
 
       <View style={styles.container}>
         <View style={styles.searchBarContainer}>
-          <Animated.View style={[styles.searchContainer, { width: searchWidth }]}>
+          <Animated.View style={[styles.searchContainer, { width: '100%' }]}>
             <View style={styles.searchInputWrapper}>
               <Feather name="search" size={18} color={COLORS.textSecondary} style={styles.searchIcon} />
               <TextInput
@@ -394,19 +387,10 @@ const PatientsScreen = () => {
                 returnKeyType="search"
                 selectionColor={COLORS.primary}
               />
-              {searchKeyword.length > 0 && (
-                <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
-                  <Feather name="x" size={16} color={COLORS.textSecondary} />
-                </TouchableOpacity>
-              )}
+            
             </View>
           </Animated.View>
 
-          <TouchableOpacity onPress={toggleSearch} style={styles.searchButton}>
-            <Animated.View style={{ opacity: iconOpacity }}>
-              <Ionicons name={isSearchExpanded ? "close" : "search"} size={24} color={COLORS.primary} />
-            </Animated.View>
-          </TouchableOpacity>
         </View>
 
         {isLoading ? (

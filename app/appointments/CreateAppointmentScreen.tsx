@@ -14,7 +14,7 @@ import {
   Image,
   Modal,
 } from "react-native"
-import { Ionicons } from "@expo/vector-icons"
+import { FontAwesome5, Ionicons } from "@expo/vector-icons"
 import DateTimePicker from "@react-native-community/datetimepicker"
 import { useRouter, useLocalSearchParams } from "expo-router"
 import { Card } from "react-native-paper"
@@ -26,6 +26,7 @@ import {
 } from "../../redux/api/appointmentApi"
 import { COLORS } from "@/constants/Colors"
 import SpecializationDropdown from "../../components/SpecializationDropdown"
+import BottomNavigation from "@/services/bottomNavigation"
 
 interface Doctor {
   _id: string
@@ -90,6 +91,7 @@ const CreateAppointmentScreen = () => {
   const [specializationDescription, setSpecializationDescription] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
+  const [selectedService, setSelectedService] = useState<{ _id: string; serviceName: string; fee: number } | null>(null)
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [availableDates, setAvailableDates] = useState<string[]>([])
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -98,6 +100,8 @@ const CreateAppointmentScreen = () => {
   const [animate, setAnimate] = useState(false)
   const [showDoctorSelection, setShowDoctorSelection] = useState(true)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [navigationIndex, setNavigationIndex] = useState(0);
+  const [showServiceDropdown, setShowServiceDropdown] = useState(false);
 
   const { data: timeSlotsData, refetch: fetchSlots } = useGetAllTimeSlotsQuery(
     selectedDoctor && selectedDate ? { doctorId: selectedDoctor, date: selectedDate } : undefined,
@@ -149,8 +153,13 @@ const CreateAppointmentScreen = () => {
           useNativeDriver: true,
         }),
       ]).start(() => setAnimate(false))
+
+      // Set default service to the first one when doctor changes
+      if (selectedDoctorDetails?.services && selectedDoctorDetails.services.length > 0) {
+        setSelectedService(selectedDoctorDetails.services[0]);
+      }
     }
-  }, [selectedDoctor])
+  }, [selectedDoctor, selectedDoctorDetails])
 
   useEffect(() => {
     const intervalId = setInterval(() => {
@@ -353,9 +362,11 @@ const CreateAppointmentScreen = () => {
     setShowConfirmModal(false)
     setIsLoading(true)
     try {
-      const selectedService = selectedDoctorDetails?.services?.[0]
-      const serviceId = selectedService?._id || selectedSpecializationId
-      const serviceFee = selectedService?.fee || 0
+      const serviceId = selectedService?._id ||
+        selectedDoctorDetails?.services?.[0]?._id ||
+        selectedSpecializationId
+      const serviceFee = selectedService?.fee ||
+        selectedDoctorDetails?.services?.[0]?.fee || 0
       const appointmentPayload = {
         doctorId: selectedDoctor,
         patientId,
@@ -378,12 +389,14 @@ const CreateAppointmentScreen = () => {
       } else if (response.message === "Appointment already submitted") {
         Alert.alert(
           "Appointment Already Submitted",
-          "Your appointment has already been submitted. Redirecting to your appointment receipt.",
+          "Your appointment has already been submitted.",
+          [
+            {
+              text: "OK",
+              onPress: () => router.replace("/dashboard/DashboardScreen")
+            }
+          ]
         )
-        router.replace({
-          pathname: "/appointments/AppointmentReciept",
-          params: { appointmentId: response.data ? response.data._id : "" },
-        })
       } else {
         Alert.alert("Error", response.message || "Failed to book appointment")
       }
@@ -425,14 +438,17 @@ const CreateAppointmentScreen = () => {
 
         <Card style={styles.card}>
           <View style={styles.topSection}>
+
             <View style={styles.patientInfoContainer}>
+              {!showDoctorSelection &&
+                <TouchableOpacity onPress={handleBackToDoctorSelection} style={styles.backToDoctorButton}>
+                  <Ionicons name="arrow-back-circle" size={24} color={COLORS.primary} />
+                  <Text style={styles.backToDoctorText}>Back to doctor selection</Text>
+                </TouchableOpacity>
+              }
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Name:</Text>
-                <Text style={styles.infoValue}>{patientName || "N/A"}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>MRN:</Text>
-                <Text style={styles.infoValue}>{mrn || "N/A"}</Text>
+                <Text style={styles.infoLabel}>Patient:</Text>
+                <Text style={styles.infoValue}>{patientName || "N/A"} (MRN: {mrn || "N/A"})</Text>
               </View>
               <View style={styles.dateContainer}>
                 <View style={styles.calendarIcon}>
@@ -441,9 +457,8 @@ const CreateAppointmentScreen = () => {
                 <View>
                   <Text style={styles.dateLabel}>Date:</Text>
                   <Text style={styles.dateValue}>
-                    {`${months[CURRENT_DATE.getMonth()]} ${CURRENT_DATE.getDate()}, ${CURRENT_DATE.getFullYear()}, ${
-                      days[CURRENT_DATE.getDay()]
-                    }`}
+                    {`${months[CURRENT_DATE.getMonth()]} ${CURRENT_DATE.getDate()}, ${CURRENT_DATE.getFullYear()}, ${days[CURRENT_DATE.getDay()]
+                      }`}
                   </Text>
                 </View>
               </View>
@@ -520,7 +535,18 @@ const CreateAppointmentScreen = () => {
           {!showDoctorSelection && (
             <>
               <View style={styles.formSection}>
-                <Text style={styles.doctorSelectedName}>Doctor: {selectedDoctorDetails?.fullName}</Text>
+                <View style={styles.doctorHeaderRow}>
+                  <View style={styles.doctorNameContainer}>
+                    <Text style={styles.doctorSelectedName}>Doctor: {selectedDoctorDetails?.fullName}</Text>
+
+                  </View>
+                  <View style={styles.doctorImageSmallContainer}>
+                    <Image
+                      source={doctorProfilePic}
+                      style={styles.doctorImageSmall}
+                    />
+                  </View>
+                </View>
                 <Text style={styles.sectionTitle}>Select Date</Text>
                 <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.datePickerButton}>
                   <Ionicons name="calendar-outline" size={22} color={COLORS.primary} />
@@ -601,6 +627,60 @@ const CreateAppointmentScreen = () => {
                     <Text style={styles.legendText}>Expired</Text>
                   </View>
                 </View>
+
+                {selectedDoctor && selectedDoctorDetails?.services && selectedDoctorDetails.services.length > 0 && (
+                  <View style={styles.serviceSelectContainer}>
+                    <Text style={styles.serviceSelectLabel}>Select Service:</Text>
+                    <View style={styles.serviceDropdownContainer}>
+                      <Ionicons name="medkit-outline" size={20} color={COLORS.primary} style={styles.serviceIcon} />
+                      <View style={styles.pickerContainer}>
+                        <TouchableOpacity
+                          style={styles.dropdownButton}
+                          onPress={() => {
+                            setShowServiceDropdown(!showServiceDropdown);
+                          }}
+                        >
+                          <Text style={styles.dropdownButtonText}>
+                            {selectedService?.serviceName || "Select Service"}
+                          </Text>
+                          <Ionicons 
+                            name={showServiceDropdown ? "chevron-up" : "chevron-down"} 
+                            size={18} 
+                            color={COLORS.primary} 
+                          />
+                        </TouchableOpacity>
+                        
+                        {showServiceDropdown && (
+                          <View style={styles.dropdownMenu}>
+                            {selectedDoctorDetails.services.map((service) => (
+                              <TouchableOpacity
+                                key={service._id}
+                                style={[
+                                  styles.dropdownItem,
+                                  selectedService?._id === service._id && styles.selectedDropdownItem
+                                ]}
+                                onPress={() => {
+                                  setSelectedService(service);
+                                  setShowServiceDropdown(false);
+                                }}
+                              >
+                                <Text
+                                  style={[
+                                    styles.dropdownItemText,
+                                    selectedService?._id === service._id && styles.selectedDropdownItemText
+                                  ]}
+                                >
+                                  {service.serviceName} - Rs {service.fee}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                )}
+
                 <View style={styles.timeSlotContainer}>
                   {selectedDoctor && selectedDate ? (
                     timeSlotsData?.data?.length ? (
@@ -666,7 +746,19 @@ const CreateAppointmentScreen = () => {
                   <View style={styles.feeContainer}>
                     <View style={styles.feeRow}>
                       <Text style={styles.feeLabel}>Consultation Fee:</Text>
-                      <Text style={styles.feeAmount}>RS {selectedDoctorDetails.services[0].fee}</Text>
+                      <Text style={styles.feeAmount}>
+                        RS {selectedService?.fee || selectedDoctorDetails.services[0].fee}
+                      </Text>
+                    </View>
+                    <View style={styles.feeRow}>
+                      <Text style={styles.feeLabel}>Online Booking Fee:</Text>
+                      <Text style={styles.feeAmount}>RS 100</Text>
+                    </View>
+                    <View style={[styles.feeRow, styles.totalFeeRow]}>
+                      <Text style={styles.totalFeeLabel}>Total Fee:</Text>
+                      <Text style={styles.totalFeeAmount}>
+                        RS {(selectedService?.fee || selectedDoctorDetails.services[0].fee) + 100}
+                      </Text>
                     </View>
                     <Text style={styles.paymentLabel}>Payment Status:</Text>
                     <View style={styles.paymentOptionsContainer}>
@@ -721,6 +813,62 @@ const CreateAppointmentScreen = () => {
         </Card>
       </ScrollView>
 
+      <View style={styles.bottomNav}>
+        <BottomNavigation
+          navigationState={{
+            index: navigationIndex,
+            routes: [
+              { key: 'appointment', title: 'Appointment', icon: 'calendar-alt' },
+              { key: 'patient', title: 'Patient', icon: 'hospital-user' },
+              { key: 'profile', title: 'Profile', icon: 'user' }
+            ]
+          }}
+          onIndexChange={(index: number) => {
+            setNavigationIndex(index);
+            switch (index) {
+              case 0:
+                router.replace('/dashboard/DashboardScreen');
+                break;
+              case 1:
+                router.replace('/dashboard/PatientScreen');
+                break;
+              case 2:
+                router.replace('/dashboard/ProfileScreen');
+                break;
+            }
+          }}
+          renderIcon={({ route, focused }: { route: { key: string; title: string; icon: string }; focused: boolean }) => (
+            <FontAwesome5
+              name={route.icon}
+              size={25}
+              color={focused ? "#1F75FE" : "#666"}
+            />
+          )}
+          renderLabel={({ route, focused }: { route: { key: string; title: string; icon: string }; focused: boolean }) => (
+            <Text
+              style={{
+                color: focused ? "#1F75FE" : "#666",
+                fontSize: 10,
+                marginTop: -5, // Reduce this value to decrease the vertical space
+                textAlign: 'center'
+              }}
+            >
+              {route.title}
+            </Text>
+          )}
+          renderScene={() => null}
+          barStyle={{ backgroundColor: 'white' }}
+          activeColor="transparent"
+          inactiveColor="transparent"
+          style={{ backgroundColor: 'transparent', height: 60 }}
+          theme={{
+            colors: {
+              secondaryContainer: 'transparent'
+            }
+          }}
+          labeled={true}
+        />
+      </View>
       <Modal visible={showConfirmModal} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
@@ -729,7 +877,11 @@ const CreateAppointmentScreen = () => {
               <Text style={styles.modalTitle}>Confirm Appointment</Text>
             </View>
             <Text style={styles.modalMessage}>
-              PLEASE NOTE THAT AN ADDITIONAL FEE OF Rs.100 WILL APPLY FOR SCHEDULING AN APPOINTMENT ONLINE. WOULD YOU
+              PLEASE NOTE THAT AN ADDITIONAL FEE OF <Text style={{
+                fontWeight: "bold",
+                fontStyle: 'italic'
+
+              }}>Rs.100</Text> WILL APPLY FOR SCHEDULING AN APPOINTMENT ONLINE. WOULD YOU
               LIKE TO PROCEED?
             </Text>
             <View style={styles.modalButtons}>
@@ -748,6 +900,16 @@ const CreateAppointmentScreen = () => {
 }
 
 const styles = StyleSheet.create({
+  bottomNav: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    elevation: 8,
+    backgroundColor: 'white',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
   container: {
     flexGrow: 1,
     paddingHorizontal: 16,
@@ -862,7 +1024,7 @@ const styles = StyleSheet.create({
     width: "35%",
   },
   formSection: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 16,
@@ -878,6 +1040,33 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: COLORS.textPrimary,
     marginBottom: 12,
+  },
+  doctorHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  doctorNameContainer: {
+    flex: 1,
+  },
+  backToDoctorButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4
+  },
+  backToDoctorText: {
+    fontSize: 18,
+    color: COLORS.primary,
+    marginLeft: 4,
+  },
+  doctorImageSmallContainer: {
+    marginLeft: 12,
+  },
+  doctorImageSmall: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   doctorCard: {
     backgroundColor: "#FFFFFF",
@@ -1150,8 +1339,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 14,
     alignItems: "center",
-    marginTop: 12,
-    marginBottom: 16,
+    marginTop: 2,
+    marginBottom: 25,
   },
   disabledButton: {
     backgroundColor: COLORS.placeholder,
@@ -1250,6 +1439,84 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#0099ff",
     textTransform: "uppercase",
+  },
+  serviceSelectContainer: {
+    marginBottom: 16,
+  },
+  serviceSelectLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: COLORS.textSecondary,
+    marginBottom: 8,
+  },
+  serviceDropdownContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.background,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  serviceIcon: {
+    marginRight: 8,
+  },
+  pickerContainer: {
+    flex: 1,
+  },
+  dropdownButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: COLORS.cardBackground,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+  },
+  dropdownButtonText: {
+    fontSize: 14,
+    color: COLORS.textPrimary,
+  },
+  dropdownMenu: {
+    marginTop: 8,
+    backgroundColor: COLORS.cardBackground,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    paddingVertical: 8,
+  },
+  dropdownItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  selectedDropdownItem: {
+    backgroundColor: COLORS.primaryLight,
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    color: COLORS.textPrimary,
+  },
+  selectedDropdownItemText: {
+    color: COLORS.cardBackground,
+  },
+  totalFeeRow: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.lightGray,
+  },
+  totalFeeLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+  },
+  totalFeeAmount: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: COLORS.primary,
   },
 })
 
