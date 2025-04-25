@@ -1,17 +1,18 @@
 import Constants from "expo-constants";
 import React, { useEffect, useState } from "react";
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  Image, 
-  Alert, 
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Image,
+  Alert,
   StyleSheet,
   Animated,
   KeyboardAvoidingView,
   Platform,
-  ScrollView
+  ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import { useSelector, useDispatch } from "react-redux";
 import { useChangePasswordMutation } from "../../redux/api/authApi";
@@ -22,24 +23,36 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { COLORS } from "@/constants/Colors";
 
+// TypeScript interfaces
+interface Hospital {
+  hospitalName?: string;
+  hospitalLogoUrl?: string;
+}
 
+interface User {
+  fullName?: string;
+  mobileNo?: string;
+  profilePicture?: string;
+  token?: string;
+  hospital?: Hospital;
+}
 
-const ProfileScreen = () => {
+const ProfileScreen: React.FC = () => {
   const router = useRouter();
   const dispatch = useDispatch();
-  const user = useSelector(selectUser); 
+  const user = useSelector(selectUser) as User | null;
 
-  const [newPassword, setNewPassword] = useState("");
-  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState<string>("");
+  const [oldPassword, setOldPassword] = useState<string>("");
   const [changePassword, { isLoading }] = useChangePasswordMutation();
-  const [profilePicture, setProfilePicture] = useState(user?.profilePicture || "");
+  const [profilePicture, setProfilePicture] = useState<string>(user?.profilePicture || "");
+  const [isImageLoading, setIsImageLoading] = useState<boolean>(false);
   
   const fadeAnim = useState(new Animated.Value(0))[0];
   const scaleAnim = useState(new Animated.Value(0.9))[0];
 
   useEffect(() => {
     loadProfilePicture();
-    
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -56,24 +69,25 @@ const ProfileScreen = () => {
 
   const loadProfilePicture = async () => {
     try {
+      setIsImageLoading(true);
       const persistentProfilePic = await AsyncStorage.getItem("persistentProfilePicture");
       
       if (persistentProfilePic) {
         setProfilePicture(persistentProfilePic);
         dispatch(updateProfilePicture(persistentProfilePic));
-        
         await AsyncStorage.setItem("profilePicture", persistentProfilePic);
       } else {
         const regularProfilePic = await AsyncStorage.getItem("profilePicture");
         if (regularProfilePic) {
           setProfilePicture(regularProfilePic);
           dispatch(updateProfilePicture(regularProfilePic));
-          
           await AsyncStorage.setItem("persistentProfilePicture", regularProfilePic);
         }
       }
     } catch (error) {
-      Alert.alert("❌ Failed to load profile picture from storage:");
+      Alert.alert("Error", "Failed to load profile picture");
+    } finally {
+      setIsImageLoading(false);
     }
   };
 
@@ -91,14 +105,14 @@ const ProfileScreen = () => {
       }),
     ]).start();
 
-    let result = await ImagePicker.launchImageLibraryAsync({
+    const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 1,
     });
 
-    if (!result.canceled && result.assets.length > 0) {
+    if (!result.canceled && result.assets?.length > 0) {
       const selectedImageUri = result.assets[0].uri;
       setProfilePicture(selectedImageUri);
 
@@ -108,10 +122,10 @@ const ProfileScreen = () => {
         type: "image/jpeg",
         name: "profile.jpg",
       } as any);
-
       formData.append("upload_preset", "PAKHIMS");
 
       try {
+        setIsImageLoading(true);
         const response = await fetch(`https://api.cloudinary.com/v1_1/dd1chofv4/image/upload`, {
           method: "POST",
           body: formData,
@@ -120,22 +134,21 @@ const ProfileScreen = () => {
         const data = await response.json();
 
         if (data.secure_url) {
-          Alert.alert("Success", "Profile picture uploaded successfully!");
-          
           const imageUrl = data.secure_url;
-          
           setProfilePicture(imageUrl);
           dispatch(updateProfilePicture(imageUrl));
           
           await AsyncStorage.setItem("profilePicture", imageUrl);
           await AsyncStorage.setItem("persistentProfilePicture", imageUrl);
           
-          console.log("✅ Saved profile picture to persistent storage");
+          Alert.alert("Success", "Profile picture uploaded successfully!");
         } else {
-          Alert.alert("Error", "Failed to upload image. Please try again.");
+          Alert.alert("Error", "Failed to upload image");
         }
       } catch (err) {
-        Alert.alert("Error", "An error occurred while uploading the image.");
+        Alert.alert("Error", "An error occurred while uploading the image");
+      } finally {
+        setIsImageLoading(false);
       }
     }
   };
@@ -155,32 +168,29 @@ const ProfileScreen = () => {
     ]).start();
 
     if (!oldPassword || !newPassword) {
-      Alert.alert("Error", "Please enter both old and new passwords.");
+      Alert.alert("Error", "Please enter both passwords");
       return;
     }
 
-    if (!user) {
-      Alert.alert("Error", "User data is missing. Please log in again.");
+    if (!user?.mobileNo) {
+      Alert.alert("Error", "User data missing. Please log in again");
       return;
     }
-
-    const requestData = {
-      mobileNo: user.mobileNo || "", 
-      oldPassword,
-      newPassword,
-    };
-
 
     try {
       const response = await fetch(
-        `${Constants.expoConfig?.extra?.API_BASE_URL}/stg_online-apmt/patient-auth/change_password`,
+        `${Constants.expoConfig?.extra?.API_BASE_URL}/online-apmt/patient-auth/change_password`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${user?.token}`,
+            Authorization: `Bearer ${user.token}`,
           },
-          body: JSON.stringify(requestData),
+          body: JSON.stringify({
+            mobileNo: user.mobileNo,
+            oldPassword,
+            newPassword,
+          }),
         }
       );
 
@@ -191,129 +201,147 @@ const ProfileScreen = () => {
         setOldPassword("");
         setNewPassword("");
       } else {
-        Alert.alert("Error", data?.message || "Failed to change password.");
+        Alert.alert("Error", data?.message || "Failed to change password");
       }
     } catch (error) {
-      Alert.alert("Error", "An error occurred while updating the password.");
+      Alert.alert("Error", "An error occurred while updating password");
     }
   };
 
   const handleLogout = async () => {
-    if (profilePicture) {
-      await AsyncStorage.setItem("persistentProfilePicture", profilePicture);
-      console.log("✅ Saved profile picture before logout:", profilePicture);
+    try {
+      if (profilePicture) {
+        await AsyncStorage.setItem("persistentProfilePicture", profilePicture);
+      }
+      
+      dispatch(logout());
+      await AsyncStorage.multiRemove(["token", "refreshToken", "profilePicture"]);
+      router.replace("/auth/LoginScreen");
+    } catch (error) {
+      Alert.alert("Error", "Failed to logout");
     }
-    
- 
-    dispatch(logout());
-    await AsyncStorage.removeItem("token");
-    await AsyncStorage.removeItem("refreshToken");
-    
- 
-    await AsyncStorage.removeItem("profilePicture");
-
-    router.replace("/auth/LoginScreen");
   };
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
-      <Animated.View 
+      <Animated.View
         style={[
           styles.mainContainer,
-          {opacity: fadeAnim, transform: [{scale: scaleAnim}]}
+          { opacity: fadeAnim, transform: [{ scale: scaleAnim }] },
         ]}
       >
         <View style={styles.header}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.backButton}
             onPress={() => router.back()}
           >
-          <Ionicons name="chevron-back" size={24} color={COLORS.primary} />
+            <Ionicons name="chevron-back" size={24} color={COLORS.primary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Edit Profile</Text>
           <View style={styles.placeholderView} />
         </View>
 
-        <ScrollView 
+        <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
-        >
+        >  
+          {/* Hospital Information */}
+          <View style={styles.hospitalSection}>
+            {user?.hospital?.hospitalLogoUrl ? (
+              <Image
+                source={{ uri: user.hospital.hospitalLogoUrl }}
+                style={styles.hospitalLogo}
+                onError={() => Alert.alert("Error", "Failed to load hospital logo")}
+              />
+            ) : (
+              <View style={styles.hospitalLogoPlaceholder}>
+                <Ionicons name="business" size={40} color={COLORS.textSecondary} />
+              </View>
+            )}
+            <Text style={styles.hospitalName}>
+              {user?.hospital?.hospitalName || "No Hospital Assigned"}
+            </Text>
+            <View style={styles.hospitalDivider} />
+          </View>
+
           <Animated.View style={styles.profileSection}>
-            <TouchableOpacity 
-              style={styles.profilePictureContainer} 
+            <TouchableOpacity
+              style={styles.profilePictureContainer}
               onPress={handleUploadImage}
               activeOpacity={0.8}
+              disabled={isImageLoading}
             >
-              <Image
-                source={{ uri: profilePicture || "https://via.placeholder.com/150" }}
-                style={styles.profilePicture}
-              />
+              {isImageLoading ? (
+                <ActivityIndicator size="large" color={COLORS.primary} />
+              ) : (
+                <Image
+                  source={{ uri: profilePicture || "https://via.placeholder.com/150" }}
+                  style={styles.profilePicture}
+                />
+              )}
               <View style={styles.editIcon}>
                 <Ionicons name="camera" size={20} color="white" />
               </View>
             </TouchableOpacity>
-            {user?.fullName && (
-              <Text style={styles.userName}>{user.fullName}</Text>
-            )}
+            <Text style={styles.userName}>{user?.fullName || "User Name"}</Text>
           </Animated.View>
 
           <View style={styles.infoSection}>
             <View style={styles.inputContainer}>
               <Text style={styles.sectionTitle}>User Information</Text>
               <Text style={styles.label}>Name</Text>
-              <TextInput 
-                style={styles.input} 
-                value={user?.fullName} 
-                editable={false} 
+              <TextInput
+                style={styles.input}
+                value={user?.fullName || ""}
+                editable={false}
               />
-
               <Text style={styles.label}>Mobile Number</Text>
-              <TextInput 
-                style={styles.input} 
-                value={user?.mobileNo} 
-                editable={false} 
+              <TextInput
+                style={styles.input}
+                value={user?.mobileNo || ""}
+                editable={false}
               />
             </View>
 
-            {/* Change Password */}
             <View style={styles.inputContainer}>
               <Text style={styles.sectionTitle}>Change Password</Text>
               <Text style={styles.label}>Current Password</Text>
               <TextInput
                 style={styles.input}
                 value={oldPassword}
-                onChangeText={(text) => setOldPassword(text)}
+                onChangeText={setOldPassword}
                 secureTextEntry
                 placeholder="Enter current password"
                 placeholderTextColor={COLORS.placeholder}
               />
-
               <Text style={styles.label}>New Password</Text>
               <TextInput
                 style={styles.input}
                 value={newPassword}
-                onChangeText={(text) => setNewPassword(text)}
+                onChangeText={setNewPassword}
                 secureTextEntry
                 placeholder="Enter new password"
                 placeholderTextColor={COLORS.placeholder}
               />
             </View>
 
-            <TouchableOpacity 
-              style={styles.changePasswordButton} 
+            <TouchableOpacity
+              style={[styles.changePasswordButton, isLoading && styles.buttonDisabled]}
               onPress={handleChangePassword}
               activeOpacity={0.8}
+              disabled={isLoading}
             >
               <Text style={styles.changePasswordText}>
                 {isLoading ? "Changing..." : "Change Password"}
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={styles.logoutButton} 
+            <TouchableOpacity
+              style={styles.logoutButton}
+             missed
               onPress={handleLogout}
               activeOpacity={0.8}
             >
@@ -348,8 +376,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   backButton: {
-    padding: 8,
-    borderRadius: 20,
+    padding: 12,
+    borderRadius: 12,
     backgroundColor: COLORS.cardBackground,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -361,34 +389,76 @@ const styles = StyleSheet.create({
     width: 44,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
+    fontSize: 22,
+    fontWeight: "700",
     color: COLORS.textPrimary,
+  },
+  hospitalSection: {
+    alignItems: "center",
+    marginBottom: 24,
+    padding: 20,
+    backgroundColor: COLORS.cardBackground,
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  hospitalLogo: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 12,
+    resizeMode: "contain",
+    backgroundColor: COLORS.background,
+  },
+  hospitalLogoPlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 12,
+    backgroundColor: COLORS.lightGray,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  hospitalName: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: COLORS.textPrimary,
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  hospitalDivider: {
+    width: "80%",
+    height: 1,
+    backgroundColor: COLORS.lightGray,
+    marginVertical: 8,
   },
   profileSection: {
     alignItems: "center",
-    marginBottom: 30,
+    marginBottom: 32,
   },
   profilePictureContainer: {
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
     elevation: 5,
-    marginBottom: 10,
+    marginBottom: 16,
   },
   profilePicture: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 3,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    borderWidth: 4,
     borderColor: COLORS.cardBackground,
   },
   editIcon: {
     position: "absolute",
-    bottom: 0,
-    right: 0,
+    bottom: 4,
+    right: 4,
     backgroundColor: COLORS.primary,
     borderRadius: 20,
     width: 40,
@@ -399,15 +469,14 @@ const styles = StyleSheet.create({
     borderColor: COLORS.cardBackground,
   },
   userName: {
-    fontSize: 20,
-    fontWeight: "bold",
+    fontSize: 24,
+    fontWeight: "700",
     color: COLORS.textPrimary,
-    marginTop: 10,
   },
   infoSection: {
     backgroundColor: COLORS.cardBackground,
     borderRadius: 16,
-    padding: 20,
+    padding: 24,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -415,13 +484,13 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   inputContainer: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
+    fontSize: 20,
+    fontWeight: "700",
     color: COLORS.textPrimary,
-    marginBottom: 15,
+    marginBottom: 16,
   },
   label: {
     fontSize: 14,
@@ -435,14 +504,13 @@ const styles = StyleSheet.create({
     borderColor: COLORS.lightGray,
     borderWidth: 1,
     borderRadius: 12,
-    paddingHorizontal: 15,
+    paddingHorizontal: 16,
     fontSize: 16,
     backgroundColor: COLORS.background,
-    marginBottom: 15,
+    marginBottom: 16,
     color: COLORS.textPrimary,
   },
   changePasswordButton: {
-    marginTop: 10,
     alignItems: "center",
     backgroundColor: COLORS.primary,
     padding: 16,
@@ -453,10 +521,14 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
   },
+  buttonDisabled: {
+    backgroundColor: COLORS.lightGray,
+    opacity: 0.7,
+  },
   changePasswordText: {
     fontSize: 16,
     color: COLORS.cardBackground,
-    fontWeight: "bold",
+    fontWeight: "700",
   },
   logoutButton: {
     marginTop: 20,
@@ -478,7 +550,7 @@ const styles = StyleSheet.create({
   logoutText: {
     fontSize: 16,
     color: COLORS.cardBackground,
-    fontWeight: "bold",
+    fontWeight: "700",
   },
 });
 

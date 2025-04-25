@@ -456,7 +456,6 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 12,
     backgroundColor: COLORS.background,
-    elevation: 2,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.05)',
   },
@@ -468,7 +467,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 2,
   },
   headerTitle: {
     fontSize: 18,
@@ -483,13 +481,12 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 8,
     marginRight: 8,
-    elevation: 2,
   },
   downloadButton: {
     backgroundColor: COLORS.success,
     borderRadius: 8,
     padding: 8,
-    elevation: 2,
+    
   },
   scrollContainer: {
     flex: 1,
@@ -535,7 +532,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 8,
-    elevation: 3,
+    
   },
   retryButtonText: {
     color: "white",
@@ -547,7 +544,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cardBackground,
     borderRadius: 12,
     overflow: "hidden",
-    elevation: 5,
+    
   },
   hospitalHeader: {
     backgroundColor: "#333",
@@ -687,7 +684,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 12,
     overflow: "hidden",
-    elevation: 3,
+    
   },
   buttonGradient: {
     paddingVertical: 14,

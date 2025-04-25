@@ -1,6 +1,4 @@
-"use client"
-
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -13,100 +11,144 @@ import {
   Easing,
   Image,
   Modal,
-} from "react-native"
-import { FontAwesome5, Ionicons } from "@expo/vector-icons"
-import DateTimePicker from "@react-native-community/datetimepicker"
-import { useRouter, useLocalSearchParams } from "expo-router"
-import { Card } from "react-native-paper"
+} from "react-native";
+import { FontAwesome5, Ionicons } from "@expo/vector-icons";
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { Card } from "react-native-paper";
 import {
   useGetAllDoctorsQuery,
   useGetAllSpecializationsQuery,
   useGetAllTimeSlotsQuery,
   useBookAppointmentMutation,
-} from "../../redux/api/appointmentApi"
-import { COLORS } from "@/constants/Colors"
-import SpecializationDropdown from "../../components/SpecializationDropdown"
-import BottomNavigation from "@/services/bottomNavigation"
+} from "../../redux/api/appointmentApi";
+import { COLORS } from "@/constants/Colors";
+import BottomNavigation from "@/services/bottomNavigation";
 
-interface Doctor {
-  _id: string
-  fullName: string
-  specialization: string
-  designationDetail?: string
-  availableDays: string[]
-  photoUrl?: string
-  weeklySchedule: {
-    day: string
-    timingScheedules: { timeFrom: string; timeTo: string }[]
-  }[]
-  services?: {
-    _id: string
-    serviceName: string
-    fee: number
-    hospitalChargesInPercentage: number
-    extra: object
-  }[]
+// Define interfaces for the data structures
+interface Service {
+  _id: string;
+  serviceName: string;
+  fee: number;
+  hospitalChargesInPercentage: number;
+  extra: Record<string, unknown>;
 }
 
-interface Specialization {
-  specializations: string
-  details: string
-  _id: string
-}
-
-interface TimeSlot {
-  slotId: string
-  slot: string
-  status: number
+interface TimingSchedule {
+  timeFrom: string;
+  timeTo: string;
 }
 
 interface Schedule {
-  day: string
-  timingScheedules: { timeFrom: string; timeTo: string }[]
+  day: string;
+  timingScheedules: TimingSchedule[];
 }
 
-const CreateAppointmentScreen = () => {
-  const router = useRouter()
-  const { patientId, patientName, mrn } = useLocalSearchParams<{
-    patientId: string
-    patientName: string
-    mrn: string
-  }>()
+interface Doctor {
+  _id: string;
+  fullName: string;
+  specialization: string;
+  designationDetail?: string;
+  availableDays: string[];
+  photoUrl?: string;
+  weeklySchedule: Schedule[];
+  services?: Service[];
+}
 
-  const CURRENT_DATE = new Date()
-  const TODAY_DATE_STRING = CURRENT_DATE.toISOString().split("T")[0]
-  const days = ["Sun", "Mon", "Tue", "Wed", "Thur", "Fri", "Sat"]
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+interface Specialization {
+  specializations: string;
+  details: string;
+  _id: string;
+}
 
-  const fadeAnim = useState(new Animated.Value(0))[0]
-  const slideAnim = useState(new Animated.Value(100))[0]
-  const spinAnim = useState(new Animated.Value(0))[0]
+interface TimeSlot {
+  slotId: string;
+  slot: string;
+  status: number;
+}
 
-  const { data: doctorsData } = useGetAllDoctorsQuery({})
-  const { data: specializationsData } = useGetAllSpecializationsQuery({})
-  const [bookAppointment] = useBookAppointmentMutation()
+interface RouteParams {
+  patientId?: string;
+  patientName?: string;
+  mrn?: string;
+}
 
-  const [selectedDoctor, setSelectedDoctor] = useState<string | null>(null)
-  const [selectedSpecialization, setSelectedSpecialization] = useState<string | null>(null)
-  const [specializationDescription, setSpecializationDescription] = useState<string | null>(null)
-  const [selectedDate, setSelectedDate] = useState<string | null>(null)
-  const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
-  const [selectedService, setSelectedService] = useState<{ _id: string; serviceName: string; fee: number } | null>(null)
-  const [showDatePicker, setShowDatePicker] = useState(false)
-  const [availableDates, setAvailableDates] = useState<string[]>([])
-  const [currentTime, setCurrentTime] = useState(new Date())
-  const [feeStatus, setFeeStatus] = useState<"paid" | "unpaid">("unpaid")
-  const [isLoading, setIsLoading] = useState(false)
-  const [animate, setAnimate] = useState(false)
-  const [showDoctorSelection, setShowDoctorSelection] = useState(true)
-  const [showConfirmModal, setShowConfirmModal] = useState(false)
-  const [navigationIndex, setNavigationIndex] = useState(0);
-  const [showServiceDropdown, setShowServiceDropdown] = useState(false);
+interface AppointmentPayload {
+  doctorId: string;
+  patientId: string;
+  date: string;
+  slotId: string;
+  services: string[];
+  feeStatus: "paid" | "unpaid";
+  appointmentDate: string;
+  fee: number;
+  extra: Record<string, unknown>;
+  discount: number;
+  discountInPercentage: number;
+}
+
+interface PaginatedSlots {
+  slots: TimeSlot[];
+  totalPages: number;
+  currentPage: number;
+}
+
+interface Route {
+  key: string;
+  title: string;
+  icon: string;
+}
+
+interface NavigationProps {
+  route: Route;
+  focused: boolean;
+}
+
+const CreateAppointmentScreen: React.FC = () => {
+  const router = useRouter();
+  const { patientId = "", patientName = "", mrn = "" } = useLocalSearchParams<RouteParams>();
+
+  const CURRENT_DATE = new Date();
+  const TODAY_DATE_STRING = CURRENT_DATE.toISOString().split("T")[0];
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thur", "Fri", "Sat"];
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+  const fadeAnim = useState(new Animated.Value(0))[0];
+  const slideAnim = useState(new Animated.Value(100))[0];
+  const spinAnim = useState(new Animated.Value(0))[0];
+
+  const { data: doctorsData } = useGetAllDoctorsQuery({});
+  const { data: specializationsData } = useGetAllSpecializationsQuery({});
+  const [bookAppointment] = useBookAppointmentMutation();
+
+  const [selectedDoctor, setSelectedDoctor] = useState<string | null>(null);
+  const [selectedSpecialization, setSelectedSpecialization] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [specializationDescription, setSpecializationDescription] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+  const [selectedService, setSelectedService] = useState<{ _id: string; serviceName: string; fee: number } | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
+  const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  const [feeStatus, setFeeStatus] = useState<"paid" | "unpaid">("unpaid");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [animate, setAnimate] = useState<boolean>(false);
+  const [showDoctorSelection, setShowDoctorSelection] = useState<boolean>(true);
+  const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
+  const [navigationIndex, setNavigationIndex] = useState<number>(0);
+  const [showServiceDropdown, setShowServiceDropdown] = useState<boolean>(false);
+  const [currentPage, setCurrentPage] = useState<number>(0);
+  const slotsPerPage = 6;
 
   const { data: timeSlotsData, refetch: fetchSlots } = useGetAllTimeSlotsQuery(
     selectedDoctor && selectedDate ? { doctorId: selectedDoctor, date: selectedDate } : undefined,
-    { skip: !selectedDoctor || !selectedDate },
-  )
+    { skip: !selectedDoctor || !selectedDate }
+  );
+
+  const selectedDoctorDetails = useMemo(() => {
+    return doctorsData?.data?.find((doc: Doctor) => doc._id === selectedDoctor) || null;
+  }, [selectedDoctor, doctorsData?.data]);
 
   useEffect(() => {
     Animated.parallel([
@@ -120,8 +162,8 @@ const CreateAppointmentScreen = () => {
         duration: 800,
         useNativeDriver: true,
       }),
-    ]).start()
-  }, [])
+    ]).start();
+  }, [fadeAnim, slideAnim]);
 
   useEffect(() => {
     if (isLoading) {
@@ -131,16 +173,16 @@ const CreateAppointmentScreen = () => {
           duration: 1000,
           easing: Easing.linear,
           useNativeDriver: true,
-        }),
-      ).start()
+        })
+      ).start();
     } else {
-      spinAnim.setValue(0)
+      spinAnim.setValue(0);
     }
-  }, [isLoading])
+  }, [isLoading, spinAnim]);
 
   useEffect(() => {
     if (selectedDoctor) {
-      setAnimate(true)
+      setAnimate(true);
       Animated.sequence([
         Animated.timing(fadeAnim, {
           toValue: 0.5,
@@ -152,41 +194,43 @@ const CreateAppointmentScreen = () => {
           duration: 300,
           useNativeDriver: true,
         }),
-      ]).start(() => setAnimate(false))
+      ]).start(() => setAnimate(false));
 
-      // Set default service to the first one when doctor changes
       if (selectedDoctorDetails?.services && selectedDoctorDetails.services.length > 0) {
         setSelectedService(selectedDoctorDetails.services[0]);
       }
     }
-  }, [selectedDoctor, selectedDoctorDetails])
+  }, [selectedDoctor, selectedDoctorDetails, fadeAnim]);
 
   useEffect(() => {
     const intervalId = setInterval(() => {
-      setCurrentTime(new Date())
-    }, 60000)
-    return () => clearInterval(intervalId)
-  }, [])
+      setCurrentTime(new Date());
+    }, 60000);
+    return () => clearInterval(intervalId);
+  }, []);
 
   const filteredDoctors = useMemo(() => {
-    return selectedSpecialization && selectedSpecialization !== ""
-      ? doctorsData?.data.filter((doc: Doctor) => doc.specialization === selectedSpecialization)
-      : doctorsData?.data
-  }, [selectedSpecialization, doctorsData?.data])
-
-  const selectedDoctorDetails = useMemo(() => {
-    return doctorsData?.data?.find((doc: Doctor) => doc._id === selectedDoctor)
-  }, [selectedDoctor, doctorsData?.data])
+    if (!doctorsData?.data) return [];
+    if (searchQuery.trim() === "") {
+      return doctorsData.data;
+    }
+    const query = searchQuery.toLowerCase().trim();
+    return doctorsData.data.filter((doc: Doctor) => {
+      const nameMatch = doc.fullName.toLowerCase().includes(query);
+      const specializationMatch = doc.specialization.toLowerCase().includes(query);
+      return nameMatch || specializationMatch;
+    });
+  }, [searchQuery, doctorsData?.data]);
 
   const selectedSpecializationId = useMemo(() => {
-    if (!selectedSpecialization || !specializationsData?.data) return null
-    const specObj = specializationsData?.data.find((s: Specialization) => s.specializations === selectedSpecialization)
-    return specObj?._id || null
-  }, [selectedSpecialization, specializationsData?.data])
+    if (!selectedSpecialization || !specializationsData?.data) return null;
+    const specObj = specializationsData.data.find((s: Specialization) => s.specializations === selectedSpecialization);
+    return specObj?._id || null;
+  }, [selectedSpecialization, specializationsData?.data]);
 
   const getStandardizedDayName = (date: Date): string => {
-    return date.toLocaleString("en-US", { weekday: "long" }).toLowerCase()
-  }
+    return date.toLocaleString("en-US", { weekday: "long" }).toLowerCase();
+  };
 
   const getShortDayName = (dayName: string): string => {
     const dayMap: Record<string, string> = {
@@ -197,195 +241,195 @@ const CreateAppointmentScreen = () => {
       thursday: "Thur",
       friday: "Fri",
       saturday: "Sat",
-    }
-    return dayMap[dayName.toLowerCase()] || dayName
-  }
+    };
+    return dayMap[dayName.toLowerCase()] || dayName;
+  };
 
   const isToday = (dateString: string): boolean => {
-    return dateString === TODAY_DATE_STRING
-  }
+    return dateString === TODAY_DATE_STRING;
+  };
 
   const isPastDate = (dateString: string): boolean => {
-    const inputDate = new Date(dateString)
-    inputDate.setHours(0, 0, 0, 0)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    return inputDate < today
-  }
+    const inputDate = new Date(dateString);
+    inputDate.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return inputDate < today;
+  };
 
-  const calculateAvailableDates = (doctor: Doctor) => {
-    if (!doctor || !doctor.weeklySchedule) return []
-    const today = new Date()
-    const available: string[] = []
-    const availableDaysMap = new Map()
+  const calculateAvailableDates = (doctor: Doctor): string[] => {
+    if (!doctor || !doctor.weeklySchedule) return [];
+    const today = new Date();
+    const available: string[] = [];
+    const availableDaysMap = new Map<string, TimingSchedule[]>();
     doctor.weeklySchedule.forEach((schedule: Schedule) => {
       if (schedule.timingScheedules && schedule.timingScheedules.length > 0) {
-        availableDaysMap.set(schedule.day.toLowerCase(), schedule.timingScheedules)
+        availableDaysMap.set(schedule.day.toLowerCase(), schedule.timingScheedules);
       }
-    })
-    if (availableDaysMap.size === 0) return []
+    });
+    if (availableDaysMap.size === 0) return [];
     for (let i = 0; i < 30; i++) {
-      const futureDate = new Date()
-      futureDate.setDate(today.getDate() + i)
-      if (futureDate < today && i > 0) continue
-      const dayName = getStandardizedDayName(futureDate)
-      const dateString = futureDate.toISOString().split("T")[0]
+      const futureDate = new Date();
+      futureDate.setDate(today.getDate() + i);
+      if (futureDate < today && i > 0) continue;
+      const dayName = getStandardizedDayName(futureDate);
+      const dateString = futureDate.toISOString().split("T")[0];
       if (availableDaysMap.has(dayName)) {
-        available.push(dateString)
+        available.push(dateString);
       }
     }
-    return available
-  }
+    return available;
+  };
 
-  const handleSpecializationChange = (spec: string | null) => {
-    setSelectedSpecialization(spec)
+  const handleSpecializationChange = (spec: string | null): void => {
+    setSelectedSpecialization(spec);
     if (!spec || spec === "") {
-      setSpecializationDescription(null)
-      setSelectedDoctor(null)
-      setSelectedDate(null)
-      setSelectedSlot(null)
-      setAvailableDates([])
+      setSpecializationDescription(null);
+      setSelectedDoctor(null);
+      setSelectedDate(null);
+      setSelectedSlot(null);
+      setAvailableDates([]);
     } else {
-      const foundSpecialization = specializationsData?.data.find((s: Specialization) => s.specializations === spec)
-      setSpecializationDescription(foundSpecialization?.details || "")
-      setSelectedDoctor(null)
-      setSelectedDate(null)
-      setSelectedSlot(null)
-      setAvailableDates([])
+      const foundSpecialization = specializationsData?.data?.find((s: Specialization) => s.specializations === spec);
+      setSpecializationDescription(foundSpecialization?.details || "");
+      setSelectedDoctor(null);
+      setSelectedDate(null);
+      setSelectedSlot(null);
+      setAvailableDates([]);
     }
-  }
+  };
 
-  const handleDoctorChange = (doctorId: string | null) => {
-    setSelectedDoctor(doctorId)
-    setSelectedSlot(null)
-    setSelectedDate(null)
+  const handleDoctorChange = (doctorId: string | null): void => {
+    setSelectedDoctor(doctorId);
+    setSelectedSlot(null);
+    setSelectedDate(null);
     if (!doctorId) {
-      setAvailableDates([])
-      setShowDoctorSelection(true)
-      return
+      setAvailableDates([]);
+      setShowDoctorSelection(true);
+      return;
     }
-    const doctorDetails = doctorsData?.data.find((doc: Doctor) => doc._id === doctorId)
+    const doctorDetails = doctorsData?.data?.find((doc: Doctor) => doc._id === doctorId);
     if (!doctorDetails) {
-      setAvailableDates([])
-      return
+      setAvailableDates([]);
+      return;
     }
-    const availableDays = calculateAvailableDates(doctorDetails)
-    setAvailableDates(availableDays)
-    if (availableDays.length > 0) {
-      setSelectedDate(availableDays[0])
-    }
-    setShowDoctorSelection(false)
-  }
+    const availableDays = calculateAvailableDates(doctorDetails);
+    setAvailableDates(availableDays);
+    setShowDoctorSelection(false);
+  };
 
-  const handleBackToDoctorSelection = () => {
-    setShowDoctorSelection(true)
-    setSelectedDoctor(null)
-    setSelectedDate(null)
-    setSelectedSlot(null)
-    setAvailableDates([])
-  }
+  const handleBackToDoctorSelection = (): void => {
+    setShowDoctorSelection(true);
+    setSelectedDoctor(null);
+    setSelectedDate(null);
+    setSelectedSlot(null);
+    setAvailableDates([]);
+  };
 
   const isDateAvailable = (date: Date): boolean => {
-    if (!selectedDoctorDetails || !selectedDoctorDetails.weeklySchedule) return false
-    const dayName = getStandardizedDayName(date)
+    if (!selectedDoctorDetails || !selectedDoctorDetails.weeklySchedule) return false;
+    const dayName = getStandardizedDayName(date);
     return selectedDoctorDetails.weeklySchedule.some(
       (schedule: Schedule) =>
-        schedule.day.toLowerCase() === dayName && schedule.timingScheedules && schedule.timingScheedules.length > 0,
-    )
-  }
+        schedule.day.toLowerCase() === dayName && schedule.timingScheedules && schedule.timingScheedules.length > 0
+    );
+  };
 
-  const filterAvailableDates = (date: Date) => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    if (date < today) return false
-    const futureLimit = new Date()
-    futureLimit.setDate(today.getDate() + 30)
-    if (date > futureLimit) return false
-    return isDateAvailable(date)
-  }
+  const filterAvailableDates = (date: Date): boolean => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (date < today) return false;
+    const futureLimit = new Date();
+    futureLimit.setDate(today.getDate() + 30);
+    if (date > futureLimit) return false;
+    return isDateAvailable(date);
+  };
 
   useEffect(() => {
     if (selectedDoctor && selectedDate) {
-      fetchSlots()
+      fetchSlots();
     }
-  }, [selectedDoctor, selectedDate, fetchSlots])
+  }, [selectedDoctor, selectedDate, fetchSlots]);
 
-  const handleDateChange = (_: any, date?: Date) => {
-    setShowDatePicker(false)
-    if (!date) return
-    const formattedDate = date.toISOString().split("T")[0]
+  const handleDateChange = (event: DateTimePickerEvent, date?: Date): void => {
+    setShowDatePicker(false);
+    if (!date) return;
+    const formattedDate = date.toISOString().split("T")[0];
     if (isPastDate(formattedDate)) {
-      Alert.alert("Invalid Date", "Please select a current or future date.")
-      return
+      Alert.alert("Invalid Date", "Please select a current or future date.");
+      return;
     }
     if (!isDateAvailable(date)) {
-      Alert.alert("Doctor Unavailable", "This doctor is not available on the selected date.")
-      return
+      Alert.alert("Doctor Unavailable", "This doctor is not available on the selected date.");
+      return;
     }
-    setSelectedDate(formattedDate)
-    setSelectedSlot(null)
-  }
+    setSelectedDate(formattedDate);
+    setSelectedSlot(null);
+    setCurrentPage(0);
+  };
 
-  const parseTimeString = (timeStr: string) => {
-    const timeRegex = /(\d+):(\d+)(?:\s*(AM|PM))?/i
-    const match = timeStr.match(timeRegex)
+  const parseTimeString = (timeStr: string): { hours: number; minutes: number } | null => {
+    const timeRegex = /(\d+):(\d+)(?:\s*(AM|PM))?/i;
+    const match = timeStr.match(timeRegex);
     if (match) {
-      let hours = Number.parseInt(match[1])
-      const minutes = Number.parseInt(match[2])
-      const period = match[3]?.toUpperCase()
-      if (period === "PM" && hours < 12) hours += 12
-      if (period === "AM" && hours === 12) hours = 0
-      return { hours, minutes }
+      let hours = Number.parseInt(match[1], 10);
+      const minutes = Number.parseInt(match[2], 10);
+      const period = match[3]?.toUpperCase();
+      if (period === "PM" && hours < 12) hours += 12;
+      if (period === "AM" && hours === 12) hours = 0;
+      return { hours, minutes };
     }
-    return null
-  }
+    return null;
+  };
 
-  const isTimeSlotPassed = (timeFromStr: string) => {
-    if (!selectedDate || !isToday(selectedDate)) return false
-    const parsedTime = parseTimeString(timeFromStr)
-    if (!parsedTime) return false
-    const { hours, minutes } = parsedTime
-    const slotTime = new Date()
-    slotTime.setHours(hours, minutes, 0, 0)
-    return currentTime > slotTime
-  }
+  const isTimeSlotPassed = (timeFromStr: string): boolean => {
+    if (!selectedDate || !isToday(selectedDate)) return false;
+    const parsedTime = parseTimeString(timeFromStr);
+    if (!parsedTime) return false;
+    const { hours, minutes } = parsedTime;
+    const slotTime = new Date();
+    slotTime.setHours(hours, minutes, 0, 0);
+    return currentTime > slotTime;
+  };
 
-  const handleConfirmBooking = async () => {
+  const handleConfirmBooking = (): void => {
     if (!selectedDoctor || !selectedDate || !selectedSlot || !patientId) {
-      Alert.alert("Incomplete Information", "Please select all required fields")
-      return
+      Alert.alert("Incomplete Information", "Please select all required fields");
+      return;
     }
-    setShowConfirmModal(true)
-  }
+    setShowConfirmModal(true);
+  };
 
-  const handleModalConfirm = async () => {
-    setShowConfirmModal(false)
-    setIsLoading(true)
+  const handleModalConfirm = async (): Promise<void> => {
+    setShowConfirmModal(false);
+    setIsLoading(true);
     try {
-      const serviceId = selectedService?._id ||
-        selectedDoctorDetails?.services?.[0]?._id ||
-        selectedSpecializationId
-      const serviceFee = selectedService?.fee ||
-        selectedDoctorDetails?.services?.[0]?.fee || 0
-      const appointmentPayload = {
-        doctorId: selectedDoctor,
+      const serviceId = selectedService?._id || selectedDoctorDetails?.services?.[0]?._id || selectedSpecializationId;
+      const serviceFee = selectedService?.fee || selectedDoctorDetails?.services?.[0]?.fee || 0;
+
+      if (!serviceId || !patientId) {
+        throw new Error("Missing required appointment information");
+      }
+
+      const appointmentPayload: AppointmentPayload = {
+        doctorId: selectedDoctor!,
         patientId,
-        date: selectedDate,
-        slotId: selectedSlot,
-        services: serviceId ? [serviceId] : selectedSpecializationId ? [selectedSpecializationId] : [],
+        date: selectedDate!,
+        slotId: selectedSlot!,
+        services: serviceId ? [serviceId] : [],
         feeStatus: feeStatus,
-        appointmentDate: selectedDate,
+        appointmentDate: selectedDate!,
         fee: serviceFee + 100,
         extra: {},
         discount: 0,
         discountInPercentage: 0,
-      }
-      const response = await bookAppointment(appointmentPayload).unwrap()
+      };
+      const response = await bookAppointment(appointmentPayload).unwrap();
       if (response.isSuccess && response.data) {
         router.replace({
           pathname: "/appointments/AppointmentReciept",
           params: { appointmentId: response.data._id },
-        })
+        });
       } else if (response.message === "Appointment already submitted") {
         Alert.alert(
           "Appointment Already Submitted",
@@ -393,38 +437,51 @@ const CreateAppointmentScreen = () => {
           [
             {
               text: "OK",
-              onPress: () => router.replace("/dashboard/DashboardScreen")
-            }
+              onPress: () => router.replace("/dashboard/DashboardScreen"),
+            },
           ]
-        )
+        );
       } else {
-        Alert.alert("Error", response.message || "Failed to book appointment")
+        Alert.alert("Error", response.message || "Failed to book appointment");
       }
     } catch (error) {
-      Alert.alert("Error", "An error occurred while booking the appointment")
+      Alert.alert("Error", "An error occurred while booking the appointment");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
-  const handleModalCancel = () => {
-    setShowConfirmModal(false)
-  }
+  const handleModalCancel = (): void => {
+    setShowConfirmModal(false);
+  };
 
   const doctorProfilePic = selectedDoctorDetails?.photoUrl
     ? { uri: selectedDoctorDetails.photoUrl }
-    : require("../../assets/images/defaultProfilePic.png")
+    : require("../../assets/images/defaultProfilePic.png");
 
   const allSpecializations = useMemo(() => {
-    const specializationsFromAPI = specializationsData?.data?.map((spec: Specialization) => spec.specializations) || []
-    const specializationsFromDoctors = doctorsData?.data?.map((doc: Doctor) => doc.specialization) || []
-    return ["All", ...new Set([...specializationsFromAPI, ...specializationsFromDoctors])]
-  }, [specializationsData?.data, doctorsData?.data])
+    const specializationsFromAPI = specializationsData?.data?.map((spec: Specialization) => spec.specializations) || [];
+    const specializationsFromDoctors = doctorsData?.data?.map((doc: Doctor) => doc.specialization) || [];
+    const uniqueSpecializations = Array.from(new Set([...specializationsFromAPI, ...specializationsFromDoctors]));
+    return ["All", ...uniqueSpecializations];
+  }, [specializationsData?.data, doctorsData?.data]);
 
   const spin = spinAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ["0deg", "360deg"],
-  })
+  });
+
+  const paginatedSlots = useMemo((): PaginatedSlots => {
+    if (!timeSlotsData?.data) return { slots: [], totalPages: 0, currentPage: 0 };
+    const totalPages = Math.ceil(timeSlotsData.data.length / slotsPerPage);
+    const startIndex = currentPage * slotsPerPage;
+    const endIndex = startIndex + slotsPerPage;
+    return {
+      slots: timeSlotsData.data.slice(startIndex, endIndex),
+      totalPages,
+      currentPage,
+    };
+  }, [timeSlotsData?.data, currentPage]);
 
   return (
     <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
@@ -438,45 +495,52 @@ const CreateAppointmentScreen = () => {
 
         <Card style={styles.card}>
           <View style={styles.topSection}>
-
             <View style={styles.patientInfoContainer}>
-              {!showDoctorSelection &&
+              {!showDoctorSelection && (
                 <TouchableOpacity onPress={handleBackToDoctorSelection} style={styles.backToDoctorButton}>
                   <Ionicons name="arrow-back-circle" size={24} color={COLORS.primary} />
-                  <Text style={styles.backToDoctorText}>Back to doctor selection</Text>
+                  <Text style={styles.backToDoctorText}>Back to Doctor Selection</Text>
                 </TouchableOpacity>
-              }
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Patient:</Text>
-                <Text style={styles.infoValue}>{patientName || "N/A"} (MRN: {mrn || "N/A"})</Text>
-              </View>
-              <View style={styles.dateContainer}>
-                <View style={styles.calendarIcon}>
-                  <Ionicons name="calendar" size={18} color="#fff" />
+              )}
+              <View style={styles.infoWrapper}>
+                <View style={styles.infoItem}>
+                  <Ionicons name="person" size={16} color={COLORS.primary} style={styles.infoIcon} />
+                  <View>
+                    <Text style={styles.infoLabel}>Patient</Text>
+                    <Text style={styles.infoValue}>{patientName || "N/A"} (MRN: {mrn || "N/A"})</Text>
+                  </View>
                 </View>
-                <View>
-                  <Text style={styles.dateLabel}>Date:</Text>
-                  <Text style={styles.dateValue}>
-                    {`${months[CURRENT_DATE.getMonth()]} ${CURRENT_DATE.getDate()}, ${CURRENT_DATE.getFullYear()}, ${days[CURRENT_DATE.getDay()]
-                      }`}
-                  </Text>
+                <View style={styles.infoItem}>
+                  <Ionicons name="calendar" size={16} color={COLORS.primary} style={styles.infoIcon} />
+                  <View>
+                    <Text style={styles.infoLabel}>Today's Date</Text>
+                    <Text style={styles.infoValue}>
+                      {`${months[CURRENT_DATE.getMonth()]} ${CURRENT_DATE.getDate()}, ${CURRENT_DATE.getFullYear()}, ${days[CURRENT_DATE.getDay()]}`}
+                    </Text>
+                  </View>
                 </View>
               </View>
             </View>
-            {showDoctorSelection && (
-              <View style={styles.specializationContainer}>
-                <SpecializationDropdown
-                  specializations={allSpecializations}
-                  selectedValue={selectedSpecialization || "All"}
-                  onValueChange={(itemValue) => handleSpecializationChange(itemValue === "All" ? null : itemValue)}
-                />
-              </View>
-            )}
           </View>
 
           {showDoctorSelection && (
             <View style={styles.formSection}>
               <Text style={styles.sectionTitle}>Select Doctor</Text>
+              <View style={styles.searchContainer}>
+                <Ionicons name="search" size={20} color={COLORS.primary} style={styles.searchIcon} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search by doctor name or specialization"
+                  placeholderTextColor={COLORS.placeholder}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+                {searchQuery ? (
+                  <TouchableOpacity onPress={() => setSearchQuery("")} style={styles.clearButton}>
+                    <Ionicons name="close-circle" size={16} color={COLORS.textSecondary} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
               <View style={styles.doctorsContainer}>
                 {filteredDoctors?.length ? (
                   filteredDoctors.map((doctor: Doctor) => (
@@ -499,13 +563,7 @@ const CreateAppointmentScreen = () => {
                             {doctor.designationDetail || "Provides healthcare for infants, children, and adolescents."}
                           </Text>
                         </View>
-                        <View style={styles.selectButtonContainer}>
-                          <TouchableOpacity style={styles.selectButton} onPress={() => handleDoctorChange(doctor._id)}>
-                            <Text style={styles.selectButtonText}>Select</Text>
-                          </TouchableOpacity>
-                        </View>
                       </View>
-
                       <View style={styles.availabilityFooter}>
                         <Text style={styles.availabilityLabel}>
                           Available:{" "}
@@ -515,6 +573,11 @@ const CreateAppointmentScreen = () => {
                               : "Contact clinic for availability"}
                           </Text>
                         </Text>
+                        <View style={styles.selectButtonContainer}>
+                          <TouchableOpacity style={styles.selectButton} onPress={() => handleDoctorChange(doctor._id)}>
+                            <Text style={styles.selectButtonText}>Select</Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     </View>
                   ))
@@ -522,9 +585,7 @@ const CreateAppointmentScreen = () => {
                   <View style={styles.noDataContainer}>
                     <Ionicons name="medical" size={40} color={COLORS.lightGray} />
                     <Text style={styles.noDataText}>
-                      {selectedSpecialization
-                        ? "No doctors available for this specialization"
-                        : "Please select a specialization first"}
+                      {searchQuery ? "No doctors found matching your search" : "No doctors available"}
                     </Text>
                   </View>
                 )}
@@ -538,13 +599,9 @@ const CreateAppointmentScreen = () => {
                 <View style={styles.doctorHeaderRow}>
                   <View style={styles.doctorNameContainer}>
                     <Text style={styles.doctorSelectedName}>Doctor: {selectedDoctorDetails?.fullName}</Text>
-
                   </View>
                   <View style={styles.doctorImageSmallContainer}>
-                    <Image
-                      source={doctorProfilePic}
-                      style={styles.doctorImageSmall}
-                    />
+                    <Image source={doctorProfilePic} style={styles.doctorImageSmall} />
                   </View>
                 </View>
                 <Text style={styles.sectionTitle}>Select Date</Text>
@@ -577,9 +634,9 @@ const CreateAppointmentScreen = () => {
                       contentContainerStyle={styles.daysScrollViewContent}
                     >
                       {availableDates.map((date) => {
-                        const dateObj = new Date(date)
-                        const isCurrentDay = isToday(date)
-                        const isSelected = selectedDate === date
+                        const dateObj = new Date(date);
+                        const isCurrentDay = isToday(date);
+                        const isSelected = selectedDate === date;
                         return (
                           <TouchableOpacity
                             key={date}
@@ -589,8 +646,9 @@ const CreateAppointmentScreen = () => {
                               isCurrentDay && styles.todayButton,
                             ]}
                             onPress={() => {
-                              setSelectedDate(date)
-                              setSelectedSlot(null)
+                              setSelectedDate(date);
+                              setSelectedSlot(null);
+                              setCurrentPage(0);
                             }}
                           >
                             <Text style={[styles.dayButtonText, isSelected && styles.selectedDayText]}>
@@ -600,7 +658,7 @@ const CreateAppointmentScreen = () => {
                               {dateObj.getDate()}
                             </Text>
                           </TouchableOpacity>
-                        )
+                        );
                       })}
                     </ScrollView>
                   </View>
@@ -615,7 +673,7 @@ const CreateAppointmentScreen = () => {
                     <Text style={styles.legendText}>Available</Text>
                   </View>
                   <View style={styles.legendItem}>
-                    <View style={[styles.legendColor, { backgroundColor: COLORS.textSecondary }]} />
+                    <View style={[styles.legendColor, { backgroundColor: COLORS.booked }]} />
                     <Text style={styles.legendText}>Booked</Text>
                   </View>
                   <View style={styles.legendItem}>
@@ -643,21 +701,21 @@ const CreateAppointmentScreen = () => {
                           <Text style={styles.dropdownButtonText}>
                             {selectedService?.serviceName || "Select Service"}
                           </Text>
-                          <Ionicons 
-                            name={showServiceDropdown ? "chevron-up" : "chevron-down"} 
-                            size={18} 
-                            color={COLORS.primary} 
+                          <Ionicons
+                            name={showServiceDropdown ? "chevron-up" : "chevron-down"}
+                            size={18}
+                            color={COLORS.primary}
                           />
                         </TouchableOpacity>
-                        
+
                         {showServiceDropdown && (
                           <View style={styles.dropdownMenu}>
-                            {selectedDoctorDetails.services.map((service) => (
+                            {selectedDoctorDetails.services.map((service: Service) => (
                               <TouchableOpacity
                                 key={service._id}
                                 style={[
                                   styles.dropdownItem,
-                                  selectedService?._id === service._id && styles.selectedDropdownItem
+                                  selectedService?._id === service._id && styles.selectedDropdownItem,
                                 ]}
                                 onPress={() => {
                                   setSelectedService(service);
@@ -667,7 +725,7 @@ const CreateAppointmentScreen = () => {
                                 <Text
                                   style={[
                                     styles.dropdownItemText,
-                                    selectedService?._id === service._id && styles.selectedDropdownItemText
+                                    selectedService?._id === service._id && styles.selectedDropdownItemText,
                                   ]}
                                 >
                                   {service.serviceName} - Rs {service.fee}
@@ -684,47 +742,87 @@ const CreateAppointmentScreen = () => {
                 <View style={styles.timeSlotContainer}>
                   {selectedDoctor && selectedDate ? (
                     timeSlotsData?.data?.length ? (
-                      <Animated.View style={[styles.rowContainer, { opacity: fadeAnim }]}>
-                        {timeSlotsData?.data?.map((slot: TimeSlot) => {
-                          const [timeFrom, timeTo] = slot.slot.split(" - ")
-                          const isSelected = selectedSlot === slot.slotId
-                          const isPastSlot = isTimeSlotPassed(timeFrom)
-                          const isAvailable = slot.status === 0 && !isPastSlot
-                          const isBooked = slot.status === 1
-                          const isExpired = slot.status === 2 || isPastSlot
-                          let slotStyle = {}
-                          let textStyle = {}
-                          if (isSelected) {
-                            slotStyle = styles.selectedSlot
-                            textStyle = { color: COLORS.success }
-                          } else if (isExpired) {
-                            slotStyle = styles.expiredSlot
-                            textStyle = { color: COLORS.danger }
-                          } else if (isBooked) {
-                            slotStyle = styles.bookedSlot
-                            textStyle = { color: COLORS.textSecondary }
-                          } else if (isAvailable) {
-                            slotStyle = styles.availableSlot
-                            textStyle = { color: COLORS.primary }
-                          }
-                          return (
-                            <View key={slot.slotId} style={styles.slotWrapper}>
-                              <TouchableOpacity
-                                onPress={() => {
-                                  if (isBooked || isExpired || isPastSlot) return
-                                  setSelectedSlot(slot.slotId)
-                                }}
-                                style={[styles.slotButton, slotStyle]}
-                                disabled={isBooked || isExpired || isPastSlot}
-                              >
-                                <Text style={[styles.slotText, textStyle]}>
-                                  {timeFrom} - {timeTo}
-                                </Text>
-                              </TouchableOpacity>
-                            </View>
-                          )
-                        })}
-                      </Animated.View>
+                      <>
+                        <Animated.View style={[styles.rowContainer, { opacity: fadeAnim }]}>
+                          {paginatedSlots.slots.map((slot: TimeSlot) => {
+                            const [timeFrom, timeTo] = slot.slot.split(" - ");
+                            const isSelected = selectedSlot === slot.slotId;
+                            const isPastSlot = isTimeSlotPassed(timeFrom);
+                            const isAvailable = slot.status === 0 && !isPastSlot;
+                            const isBooked = slot.status === 1;
+                            const isExpired = slot.status === 2 || isPastSlot;
+                            let slotStyle = {};
+                            let textStyle = {};
+                            if (isSelected) {
+                              slotStyle = styles.selectedSlot;
+                              textStyle = { color: COLORS.success };
+                            } else if (isExpired) {
+                              slotStyle = styles.expiredSlot;
+                              textStyle = { color: COLORS.danger };
+                            } else if (isBooked) {
+                              slotStyle = styles.bookedSlot;
+                              textStyle = { color: COLORS.booked };
+                            } else if (isAvailable) {
+                              slotStyle = styles.availableSlot;
+                              textStyle = { color: COLORS.primary };
+                            }
+                            return (
+                              <View key={slot.slotId} style={styles.slotWrapper}>
+                                <TouchableOpacity
+                                  onPress={() => {
+                                    if (isBooked || isExpired || isPastSlot) return;
+                                    setSelectedSlot(slot.slotId);
+                                  }}
+                                  style={[styles.slotButton, slotStyle]}
+                                  disabled={isBooked || isExpired || isPastSlot}
+                                >
+                                  <Text style={[styles.slotText, textStyle]}>
+                                    {timeFrom} - {timeTo}
+                                  </Text>
+                                </TouchableOpacity>
+                              </View>
+                            );
+                          })}
+                        </Animated.View>
+
+                        {paginatedSlots.totalPages > 1 && (
+                          <View style={styles.paginationContainer}>
+                            <TouchableOpacity
+                              style={[
+                                styles.paginationButton,
+                                currentPage === 0 && styles.paginationButtonDisabled,
+                              ]}
+                              onPress={() => setCurrentPage((prev) => Math.max(0, prev - 1))}
+                              disabled={currentPage === 0}
+                            >
+                              <Ionicons
+                                name="chevron-back"
+                                size={20}
+                                color={currentPage === 0 ? COLORS.lightGray : COLORS.primary}
+                              />
+                            </TouchableOpacity>
+
+                            <Text style={styles.paginationText}>
+                              {currentPage + 1} / {paginatedSlots.totalPages}
+                            </Text>
+
+                            <TouchableOpacity
+                              style={[
+                                styles.paginationButton,
+                                currentPage === paginatedSlots.totalPages - 1 && styles.paginationButtonDisabled,
+                              ]}
+                              onPress={() => setCurrentPage((prev) => Math.min(paginatedSlots.totalPages - 1, prev + 1))}
+                              disabled={currentPage === paginatedSlots.totalPages - 1}
+                            >
+                              <Ionicons
+                                name="chevron-forward"
+                                size={20}
+                                color={currentPage === paginatedSlots.totalPages - 1 ? COLORS.lightGray : COLORS.primary}
+                              />
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </>
                     ) : (
                       <View style={styles.noSlotsContainer}>
                         <Ionicons name="calendar-outline" size={40} color={COLORS.lightGray} />
@@ -734,7 +832,11 @@ const CreateAppointmentScreen = () => {
                   ) : (
                     <View style={styles.noSlotsContainer}>
                       <Ionicons name="time-outline" size={40} color={COLORS.lightGray} />
-                      <Text style={styles.noSlotsText}>Please select a date to view available slots</Text>
+                      <Text style={styles.noSlotsText}>
+                        {selectedDoctor && !selectedDate
+                          ? "Please select a date to view available slots"
+                          : "Please select a doctor first"}
+                      </Text>
                     </View>
                   )}
                 </View>
@@ -745,7 +847,7 @@ const CreateAppointmentScreen = () => {
                   <Text style={styles.sectionTitle}>Payment Details</Text>
                   <View style={styles.feeContainer}>
                     <View style={styles.feeRow}>
-                      <Text style={styles.feeLabel}>Consultation Fee:</Text>
+                      <Text style={styles.feeLabel}>Service Fee:</Text>
                       <Text style={styles.feeAmount}>
                         RS {selectedService?.fee || selectedDoctorDetails.services[0].fee}
                       </Text>
@@ -818,53 +920,49 @@ const CreateAppointmentScreen = () => {
           navigationState={{
             index: navigationIndex,
             routes: [
-              { key: 'appointment', title: 'Appointment', icon: 'calendar-alt' },
-              { key: 'patient', title: 'Patient', icon: 'hospital-user' },
-              { key: 'profile', title: 'Profile', icon: 'user' }
-            ]
+              { key: "appointment", title: "Appointment", icon: "calendar-alt" },
+              { key: "patient", title: "Patient", icon: "hospital-user" },
+              { key: "profile", title: "Profile", icon: "user" },
+            ],
           }}
           onIndexChange={(index: number) => {
             setNavigationIndex(index);
             switch (index) {
               case 0:
-                router.replace('/dashboard/DashboardScreen');
+                router.replace("/dashboard/DashboardScreen");
                 break;
               case 1:
-                router.replace('/dashboard/PatientScreen');
+                router.replace("/dashboard/PatientScreen");
                 break;
               case 2:
-                router.replace('/dashboard/ProfileScreen');
+                router.replace("/dashboard/ProfileScreen");
                 break;
             }
           }}
-          renderIcon={({ route, focused }: { route: { key: string; title: string; icon: string }; focused: boolean }) => (
-            <FontAwesome5
-              name={route.icon}
-              size={25}
-              color={focused ? "#1F75FE" : "#666"}
-            />
+          renderIcon={({ route, focused }: NavigationProps) => (
+            <FontAwesome5 name={route.icon} size={25} color={focused ? "#1F75FE" : "#666"} />
           )}
-          renderLabel={({ route, focused }: { route: { key: string; title: string; icon: string }; focused: boolean }) => (
+          renderLabel={({ route, focused }: NavigationProps) => (
             <Text
               style={{
                 color: focused ? "#1F75FE" : "#666",
                 fontSize: 10,
-                marginTop: -5, // Reduce this value to decrease the vertical space
-                textAlign: 'center'
+                marginTop: -5,
+                textAlign: "center",
               }}
             >
               {route.title}
             </Text>
           )}
           renderScene={() => null}
-          barStyle={{ backgroundColor: 'white' }}
+          barStyle={{ backgroundColor: "white" }}
           activeColor="transparent"
           inactiveColor="transparent"
-          style={{ backgroundColor: 'transparent', height: 60 }}
+          style={{ backgroundColor: "transparent", height: 60 }}
           theme={{
             colors: {
-              secondaryContainer: 'transparent'
-            }
+              secondaryContainer: "transparent",
+            },
           }}
           labeled={true}
         />
@@ -877,12 +975,7 @@ const CreateAppointmentScreen = () => {
               <Text style={styles.modalTitle}>Confirm Appointment</Text>
             </View>
             <Text style={styles.modalMessage}>
-              PLEASE NOTE THAT AN ADDITIONAL FEE OF <Text style={{
-                fontWeight: "bold",
-                fontStyle: 'italic'
-
-              }}>Rs.100</Text> WILL APPLY FOR SCHEDULING AN APPOINTMENT ONLINE. WOULD YOU
-              LIKE TO PROCEED?
+              Please note that an additional fee of <Text style={{ fontWeight: "900", fontStyle: "italic" }}>Rs.100</Text> will apply for scheduling an appointment online. Would you like to proceed?
             </Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.modalCancelButton} onPress={handleModalCancel}>
@@ -896,19 +989,18 @@ const CreateAppointmentScreen = () => {
         </View>
       </Modal>
     </Animated.View>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   bottomNav: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    elevation: 8,
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: "#eee",
   },
   container: {
     flexGrow: 1,
@@ -942,16 +1034,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 2,
-  },
-  backContainer: {
-    marginBottom: 20,
-  },
-  backText: {
-    marginLeft: 8,
-    color: COLORS.primary,
-    fontSize: 16,
-    fontWeight: "500",
   },
   headerTitle: {
     fontSize: 22,
@@ -963,65 +1045,46 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cardBackground,
     padding: 16,
     borderRadius: 12,
-    elevation: 4,
     shadowColor: COLORS.textPrimary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
   },
   topSection: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
     marginBottom: 20,
   },
   patientInfoContainer: {
     backgroundColor: COLORS.cardBackground,
     padding: 12,
     borderRadius: 8,
-    flex: 1,
-    marginRight: 12,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
   },
-  infoRow: {
+  infoWrapper: {
     flexDirection: "row",
-    marginBottom: 6,
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  infoItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    marginRight: 16,
+  },
+  infoIcon: {
+    marginRight: 8,
   },
   infoLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.textPrimary,
-    marginRight: 6,
+    fontSize: 12,
+    fontWeight: "500",
+    color: COLORS.textSecondary,
+    marginBottom: 2,
   },
   infoValue: {
     fontSize: 14,
-    color: COLORS.textPrimary,
-    flexShrink: 1,
-  },
-  dateContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 8,
-  },
-  calendarIcon: {
-    backgroundColor: "#0099ff",
-    width: 28,
-    height: 28,
-    borderRadius: 4,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 8,
-  },
-  dateLabel: {
-    fontSize: 14,
     fontWeight: "600",
     color: COLORS.textPrimary,
-  },
-  dateValue: {
-    fontSize: 14,
-    color: COLORS.textPrimary,
-  },
-  specializationContainer: {
-    width: "35%",
   },
   formSection: {
     marginBottom: 20,
@@ -1053,10 +1116,10 @@ const styles = StyleSheet.create({
   backToDoctorButton: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 4
+    marginBottom: 12,
   },
   backToDoctorText: {
-    fontSize: 18,
+    fontSize: 16,
     color: COLORS.primary,
     marginLeft: 4,
   },
@@ -1079,7 +1142,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 1,
   },
   cardTopSection: {
     flexDirection: "row",
@@ -1118,18 +1180,19 @@ const styles = StyleSheet.create({
     color: "#000000",
   },
   selectButtonContainer: {
+    width: "30%",
     marginLeft: 8,
     justifyContent: "center",
   },
   selectButton: {
     backgroundColor: "#0099ff",
-    borderRadius: 4,
-    paddingVertical: 8,
+    borderRadius: 8,
+    paddingVertical: 6,
     paddingHorizontal: 16,
   },
   selectButtonText: {
     color: "#FFFFFF",
-    fontSize: 14,
+    fontSize: 10,
     fontWeight: "600",
     textAlign: "center",
   },
@@ -1138,11 +1201,16 @@ const styles = StyleSheet.create({
     borderTopColor: "#E8E8E8",
     paddingTop: 8,
     marginTop: 4,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   availabilityLabel: {
     fontSize: 13,
     fontWeight: "600",
     color: "#000000",
+    width: "65%",
+    flexWrap: "wrap",
   },
   availabilityDays: {
     fontSize: 13,
@@ -1164,9 +1232,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.textPrimary,
     marginLeft: 8,
-  },
-  disabledInput: {
-    color: COLORS.placeholder,
   },
   availableDaysContainer: {
     marginTop: 12,
@@ -1227,7 +1292,7 @@ const styles = StyleSheet.create({
   },
   slotWrapper: {
     margin: 4,
-    width: "48%",
+    width: "30%",
   },
   slotButton: {
     backgroundColor: COLORS.background,
@@ -1250,8 +1315,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(67, 97, 238, 0.05)",
   },
   bookedSlot: {
-    borderColor: COLORS.textSecondary,
-    backgroundColor: "rgba(108, 117, 125, 0.1)",
+    borderColor: COLORS.booked,
+    backgroundColor: "rgba(148, 158, 167, 0.027)",
   },
   expiredSlot: {
     borderColor: COLORS.danger,
@@ -1260,14 +1325,6 @@ const styles = StyleSheet.create({
   slotText: {
     fontSize: 14,
     textAlign: "center",
-  },
-  expiredText: {
-    fontSize: 12,
-    color: COLORS.danger,
-    marginTop: 4,
-  },
-  slotIcon: {
-    marginTop: 4,
   },
   noSlotsContainer: {
     alignItems: "center",
@@ -1279,6 +1336,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: "center",
     fontSize: 14,
+    paddingHorizontal: 20,
   },
   feeContainer: {
     backgroundColor: COLORS.background,
@@ -1390,7 +1448,6 @@ const styles = StyleSheet.create({
     padding: 20,
     width: "80%",
     maxWidth: 350,
-    elevation: 5,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -1423,6 +1480,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     marginRight: 12,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    borderRadius: 5,
   },
   modalCancelText: {
     fontSize: 14,
@@ -1433,6 +1493,9 @@ const styles = StyleSheet.create({
   modalConfirmButton: {
     paddingVertical: 8,
     paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: "#0099ff",
+    borderRadius: 5,
   },
   modalConfirmText: {
     fontSize: 14,
@@ -1518,6 +1581,52 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: COLORS.primary,
   },
-})
+  paginationContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 16,
+  },
+  paginationButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  paginationButtonDisabled: {
+    borderColor: COLORS.lightGray,
+    backgroundColor: COLORS.background,
+  },
+  paginationText: {
+    marginHorizontal: 16,
+    fontSize: 14,
+    color: COLORS.textPrimary,
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.background,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  searchIcon: {
+    marginRight: 4,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: COLORS.textPrimary,
+  },
+  clearButton: {
+    padding: 4,
+  },
+});
 
-export default CreateAppointmentScreen
+export default CreateAppointmentScreen;

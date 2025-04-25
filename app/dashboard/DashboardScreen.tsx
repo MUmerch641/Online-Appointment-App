@@ -246,24 +246,24 @@ const DashboardScreen = () => {
     });
   };
 
-  const handlePrintData = (appointmentId: string): void => {
-    Alert.alert(
-      "Print Prescription",
-      "Would you like to view/print the prescription?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "View",
-          onPress: () => {
-            router.push({
-              pathname: "/appointments/PrescriptionScreen",
-              params: { appointmentId }
-            });
-          }
-        },
-      ]
-    );
-  };
+  // const handlePrintData = (appointmentId: string): void => {
+  //   Alert.alert(
+  //     "Print Prescription",
+  //     "Would you like to view/print the prescription?",
+  //     [
+  //       { text: "Cancel", style: "cancel" },
+  //       {
+  //         text: "View",
+  //         onPress: () => {
+  //           router.push({
+  //             pathname: "/appointments/PrescriptionScreen",
+  //             params: { appointmentId }
+  //           });
+  //         }
+  //       },
+  //     ]
+  //   );
+  // };
   
   const formatDate = (dateString: string): string => {
     if (!dateString) return "N/A";
@@ -354,15 +354,17 @@ const DashboardScreen = () => {
               fullName: item.doctor?.fullName || "Not assigned"
             },
             appointmentDate: item.appointmentDate,
-            slot: item.appointmentTime?.from || "N/A",
-            isCanceled: item.isApmtCanceled,
+            slot: item.appointmentTime
+            ? `${item.appointmentTime.from} - ${item.appointmentTime.to}`
+            : "N/A",
+                      isCanceled: item.isApmtCanceled,
             isPrescriptionCreated: item.isPrescriptionCreated,
             isChecked: item.isPrescriptionCreated
           }}
           onRetake={() => handleRetakeAppointment(item)}
           onToken={() => handleViewToken(item._id)}
           onCancel={() => handleCancelAppointment(item._id)}
-          onPrintData={handlePrintData}
+          // onPrintData={handlePrintData}
         />
         <InstructionModal 
           visible={instructionsVisible}
@@ -521,7 +523,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
-    elevation: 2,
+    
   },
   appointmentText: { 
     fontSize: 14, 
@@ -537,7 +539,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     paddingHorizontal: 12,
     paddingVertical: 4,
-    elevation: 2,
+    
     borderWidth: 1,
     borderColor: COLORS.lightGray,
   },
@@ -586,7 +588,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cardBackground,
     borderRadius: 12,
     marginBottom: 12,
-    elevation: 3,
+    
     overflow: "hidden",
     borderLeftWidth: 4,
     borderLeftColor: COLORS.primary,
@@ -659,7 +661,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 6,
     marginLeft: 8,
-    elevation: 1,
+    
   },
   tokenButton: {
     backgroundColor: COLORS.tokenPurple, 
@@ -680,7 +682,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cardBackground,
     borderRadius: 12,
     marginTop: 20,
-    elevation: 2,
+    
     borderWidth: 1,
     borderColor: COLORS.lightGray,
     borderStyle: "dashed",
@@ -719,7 +721,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 8,
-    elevation: 2,
+    
   },
   createAppointmentText: {
     color: "white",
@@ -739,7 +741,7 @@ helpButton: {
   marginRight: 10,
   flexDirection: "row",
   alignItems: "center",
-  elevation: 2,
+  
 },
 helpButtonText: {
   fontSize: 14,

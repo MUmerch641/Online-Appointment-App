@@ -13,4 +13,5 @@ export  const COLORS = {
   lightGray: "#DEE2E6", 
   placeholder: "#ADB5BD", 
   tokenPurple: "#7209B7", 
+  booked: "#C9C9C9",
 };

@@ -3,7 +3,7 @@ import Constants from "expo-constants";
 import { setUser } from "../slices/authSlice";
 import { RootState } from "../store";
 
-const API_BASE_URL = `${Constants.expoConfig?.extra?.API_BASE_URL}/stg_online-apmt`;
+const API_BASE_URL = `${Constants.expoConfig?.extra?.API_BASE_URL}/online-apmt`;
 
 // Define error response interface
 interface ErrorResponse {
@@ -118,7 +118,6 @@ export const authApi = createApi({
     }),
     registerUser: builder.mutation({
       query: (userData: RegisterUserRequest) => {
-        console.log("Registering with project ID:", userData.projectId);
         
         // Additional validation for project ID
         if (!userData.projectId || userData.projectId.length !== 24) {
@@ -147,7 +146,6 @@ export const authApi = createApi({
       },
       // Transform successful response to ensure consistent structure
       transformResponse: (response: ApiResponse) => {
-        console.log("Register API response:", JSON.stringify(response));
         
         if (response?.message?.toLowerCase().includes("already registerd") || 
             response?.message?.toLowerCase().includes("already registered") ||
@@ -172,7 +170,6 @@ export const authApi = createApi({
         meta: FetchBaseQueryMeta | undefined, 
         arg: RegisterUserRequest
       ) => {
-        console.log("Register API error:", JSON.stringify(response));
         
         const errorData = response.data as any;
         
@@ -195,7 +192,6 @@ export const authApi = createApi({
       async onQueryStarted(_, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          console.log("📤 API User Profile Response:", data);
           dispatch(setUser(data));
         } catch (error) {
           console.error("❌ User Profile API Error:", error);

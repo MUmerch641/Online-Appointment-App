@@ -20,11 +20,13 @@ import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Animatable from "react-native-animatable";
 import { COLORS } from "@/constants/Colors";
+import { Ionicons } from "@expo/vector-icons";
 
 const LoginScreen = () => {
   const dispatch = useDispatch();
-  const [mobileNo, setMobileNo] = useState<string>("");
+  const [mobileNo, setMobileNo] = useState<string>("03");
   const [password, setPassword] = useState<string>("");
+  const [passwordVisible, setPasswordVisible] = useState<boolean>(false);
   const [loginUser, { isLoading, error }] = useLoginUserMutation();
   const router = useRouter();
   const user = useSelector(selectUser);
@@ -100,7 +102,6 @@ const LoginScreen = () => {
       const response = await loginUser(loginData).unwrap();
 
       if (response?.isSuccess && response?.data?.token) {
-        console.log("JWT Token:", response.data.token);
         dispatch(setUser(response.data));
       } else {
         Alert.alert("Login Failed", response?.message || "Invalid credentials. Please try again.");
@@ -113,6 +114,18 @@ const LoginScreen = () => {
 
   const toggleRememberMe = () => {
     setRememberMe(!rememberMe);
+  };
+
+  const handleMobileNoChange = (text: string) => {
+    if (text.length <= 11) {
+      if (text.startsWith("03")) {
+        setMobileNo(text);
+      } else if (text.length >= 2) {
+        setMobileNo("03" + text.substring(2));
+      } else {
+        setMobileNo("03");
+      }
+    }
   };
 
   const errorMessage = (() => {
@@ -210,9 +223,10 @@ const LoginScreen = () => {
                     <TextInput
                       placeholder="Enter your mobile number"
                       value={mobileNo}
-                      onChangeText={setMobileNo}
+                      onChangeText={handleMobileNoChange}
                       keyboardType="phone-pad"
                       style={styles.textInput}
+                      maxLength={11}
                     />
                   </Animatable.View>
 
@@ -223,38 +237,26 @@ const LoginScreen = () => {
                     style={styles.inputContainer}
                   >
                     <Text style={styles.inputLabel}>Password</Text>
-                    <TextInput
-                      placeholder="Enter your password"
-                      value={password}
-                      onChangeText={setPassword}
-                      secureTextEntry
-                      style={styles.textInput}
-                    />
+                    <View style={styles.passwordContainer}>
+                      <TextInput
+                        placeholder="Enter your password"
+                        value={password}
+                        onChangeText={setPassword}
+                        secureTextEntry={!passwordVisible}
+                        style={[styles.textInput, { flex: 1 }]}
+                      />
+                      <TouchableOpacity 
+                        style={styles.eyeIcon} 
+                        onPress={() => setPasswordVisible(!passwordVisible)}
+                      >
+                        <Ionicons 
+                          name={passwordVisible ? "eye" : "eye-off"} 
+                          size={24} 
+                          color="#666" 
+                        />
+                      </TouchableOpacity>
+                    </View>
                   </Animatable.View>
-
-                  {/* <Animatable.View 
-                    animation="fadeInUp" 
-                    duration={800} 
-                    delay={800} 
-                    style={styles.row}
-                  >
-                    <TouchableOpacity 
-                      style={styles.checkboxContainer} 
-                      onPress={toggleRememberMe}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.rememberText}>
-                        {rememberMe ? "☑" : "☐"} Remember Me
-                      </Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity 
-                      onPress={() => router.push("/auth/ForgotPassword")}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.forgotPassword}>Forgot Password?</Text>
-                    </TouchableOpacity>
-                  </Animatable.View> */}
                 </Animated.View>
               </View>
               
@@ -331,7 +333,7 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.15,
     shadowRadius: 12,
-    elevation: 6,
+    
   },
   logoContainer: {
     alignItems: "center",
@@ -405,7 +407,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    elevation: 3,
+    
     shadowColor: "#1F75FE",
     shadowOffset: {
       width: 0,
@@ -445,6 +447,17 @@ const styles = StyleSheet.create({
   bottomContainer: {
     width: "100%",
     marginTop: 10,
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  eyeIcon: {
+    position: 'absolute',
+    right: 15,
+    height: '100%',
+    justifyContent: 'center',
   },
 });
 

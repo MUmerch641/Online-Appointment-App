@@ -21,6 +21,7 @@ import { setUser } from "../../redux/slices/authSlice";
 import { router, useLocalSearchParams } from "expo-router";
 import * as Animatable from "react-native-animatable";
 import { COLORS } from "@/constants/Colors";
+import { Ionicons } from "@expo/vector-icons";
 
 // Define a properly typed User interface for Redux
 interface User {
@@ -65,18 +66,20 @@ const SignupScreen = () => {
   const projectId = params.projectId;
   const dispatch = useDispatch();
   const [fullName, setFullName] = useState<string>("");
-  const [mobileNo, setMobileNo] = useState<string>("");
+  const [mobileNo, setMobileNo] = useState<string>("03");
   const [password, setPassword] = useState<string>("");
   const [confirmPassword, setConfirmPassword] = useState<string>("");
+  const [passwordVisible, setPasswordVisible] = useState<boolean>(false);
+  const [confirmPasswordVisible, setConfirmPasswordVisible] = useState<boolean>(false);
   const [registerUser, { isLoading, error }] = useRegisterUserMutation();
   const [rememberMe, setRememberMe] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeInput, setActiveInput] = useState<string | null>(null);
 
   // Fetch hospital information by projectId
-  const { 
-    data: hospitalData, 
-    isLoading: isLoadingHospital, 
+  const {
+    data: hospitalData,
+    isLoading: isLoadingHospital,
     error: hospitalError,
     isError: isHospitalError
   } = useGetHospitalByProjectIdQuery(projectId || '', {
@@ -90,7 +93,7 @@ const SignupScreen = () => {
   // Prevent access without a valid project ID
   useEffect(() => {
 
-    
+
     const validateProjectId = () => {
       if (!projectId) {
         // No project ID provided
@@ -199,18 +202,29 @@ const SignupScreen = () => {
       styles.inputContainer,
       activeInput === inputName && {
         transform: [{ scale: 1.02 }],
-        shadowColor: "#1F75FE",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 5,
+        borderColor: "#e0e0e0",
+        borderWidth: 1,
       },
       // Add error style for phone number field if that's the error
-      inputName === "mobileNo" && 
-      errorMessage && 
-      errorMessage.includes("Phone number already") && 
+      inputName === "mobileNo" &&
+      errorMessage &&
+      errorMessage.includes("Phone number already") &&
       styles.errorInput,
     ];
+  };
+
+  // Handle mobile number input with prefix and character limit
+  const handleMobileNoChange = (text: string) => {
+    if (text.length <= 11) {
+      // Ensure "03" prefix is always there
+      if (text.startsWith("03")) {
+        setMobileNo(text);
+      } else if (text.length >= 2) {
+        setMobileNo("03" + text.substring(2));
+      } else {
+        setMobileNo("03");
+      }
+    }
   };
 
   // Handle signup logic
@@ -255,20 +269,17 @@ const SignupScreen = () => {
       projectId,
     };
 
-    console.log("Submitting signup data:", JSON.stringify({
-      ...signupData,
-      password: "******" // Don't log the actual password
-    }));
+
 
     try {
       const response: ApiResponse = await registerUser(signupData).unwrap();
 
       // Check registration response 
-      const isSuccess = response.isSuccess === true && 
-                     !response.message?.toLowerCase().includes("already");
-      
+      const isSuccess = response.isSuccess === true &&
+        !response.message?.toLowerCase().includes("already");
+
       if (isSuccess) {
-        
+
         // Create a properly typed User object
         const userData: User = {
           _id: '',
@@ -277,7 +288,7 @@ const SignupScreen = () => {
           token: '',
           refreshToken: ''
         };
-        
+
         // Extract user data from response based on its structure
         if (response.data) {
           // If response has a data property containing user info
@@ -294,10 +305,10 @@ const SignupScreen = () => {
           userData.token = response.token || '';
           userData.refreshToken = response.refreshToken || '';
         }
-        
+
         // Store user data in Redux
         dispatch(setUser(userData));
-        
+
         // Navigate to dashboard
         router.replace("/dashboard/DashboardScreen");
       } else {
@@ -309,7 +320,7 @@ const SignupScreen = () => {
       // Handle registration error
       const errorMsg = err?.data?.message || "Signup failed. Please check your details.";
       setErrorMessage(errorMsg);
-      
+
       // Special handling for existing phone number
       if (errorMsg.includes("already registered") || errorMsg.includes("already exists")) {
         Alert.alert(
@@ -327,7 +338,7 @@ const SignupScreen = () => {
       <View style={styles.noProjectContainer}>
         <Text style={styles.errorTitle}>Access Denied</Text>
         <Text style={styles.errorMessage}>
-          You cannot access the signup page directly. 
+          You cannot access the signup page directly.
           Please scan a valid QR code to proceed with registration.
         </Text>
         <TouchableOpacity
@@ -425,8 +436,8 @@ const SignupScreen = () => {
 
               {/* Display error message if there is one */}
               {errorMessage && (
-                <Animatable.View 
-                  animation='fadeIn' 
+                <Animatable.View
+                  animation='fadeIn'
                   duration={300}
                   style={styles.errorContainer}
                 >
@@ -463,13 +474,14 @@ const SignupScreen = () => {
                     placeholder='Enter Phone Number'
                     keyboardType='phone-pad'
                     value={mobileNo}
-                    onChangeText={setMobileNo}
+                    onChangeText={handleMobileNoChange}
                     style={[
                       styles.textInput,
                       errorMessage && errorMessage.includes("Phone number already") && styles.inputError
                     ]}
                     onFocus={() => handleInputFocus("mobileNo")}
                     onBlur={handleInputBlur}
+                    maxLength={11}
                   />
                   {errorMessage && errorMessage.includes("Phone number already") && (
                     <Text style={styles.fieldErrorText}>This phone number is already registered</Text>
@@ -483,15 +495,27 @@ const SignupScreen = () => {
                   style={getInputContainerStyle("password")}
                 >
                   <Text style={styles.inputLabel}>Password</Text>
-                  <TextInput
-                    placeholder='Enter Password'
-                    secureTextEntry
-                    value={password}
-                    onChangeText={setPassword}
-                    style={styles.textInput}
-                    onFocus={() => handleInputFocus("password")}
-                    onBlur={handleInputBlur}
-                  />
+                  <View style={styles.passwordContainer}>
+                    <TextInput
+                      placeholder='Enter Password'
+                      secureTextEntry={!passwordVisible}
+                      value={password}
+                      onChangeText={setPassword}
+                      style={[styles.textInput, styles.passwordInput]}
+                      onFocus={() => handleInputFocus("password")}
+                      onBlur={handleInputBlur}
+                    />
+                    <TouchableOpacity
+                      style={styles.eyeIcon}
+                      onPress={() => setPasswordVisible(!passwordVisible)}
+                    >
+                      <Ionicons
+                        name={passwordVisible ? "eye" : "eye-off"}
+                        size={24}
+                        color="#666"
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </Animatable.View>
 
                 <Animatable.View
@@ -501,37 +525,29 @@ const SignupScreen = () => {
                   style={getInputContainerStyle("confirmPassword")}
                 >
                   <Text style={styles.inputLabel}>Confirm Password</Text>
-                  <TextInput
-                    placeholder='Confirm Password'
-                    secureTextEntry
-                    value={confirmPassword}
-                    onChangeText={setConfirmPassword}
-                    style={styles.textInput}
-                    onFocus={() => handleInputFocus("confirmPassword")}
-                    onBlur={handleInputBlur}
-                  />
+                  <View style={styles.passwordContainer}>
+                    <TextInput
+                      placeholder='Confirm Password'
+                      secureTextEntry={!confirmPasswordVisible}
+                      value={confirmPassword}
+                      onChangeText={setConfirmPassword}
+                      style={[styles.textInput, styles.passwordInput]}
+                      onFocus={() => handleInputFocus("confirmPassword")}
+                      onBlur={handleInputBlur}
+                    />
+                    <TouchableOpacity
+                      style={styles.eyeIcon}
+                      onPress={() => setConfirmPasswordVisible(!confirmPasswordVisible)}
+                    >
+                      <Ionicons
+                        name={confirmPasswordVisible ? "eye-off" : "eye"}
+                        size={24}
+                        color="#666"
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </Animatable.View>
 
-                <Animatable.View
-                  animation='fadeInUp'
-                  duration={800}
-                  delay={900}
-                  style={styles.row}
-                >
-                  <TouchableOpacity
-                    style={styles.checkboxContainer}
-                    onPress={toggleRememberMe}
-                  >
-                    <Text style={styles.rememberText}>
-                      {rememberMe ? "☑" : "☐"} Remember Me
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => router.push("/auth/ForgotPassword")}
-                  >
-                    <Text style={styles.forgotPassword}>Forgot Password?</Text>
-                  </TouchableOpacity>
-                </Animatable.View>
               </View>
 
               <View style={styles.bottomContainer}>
@@ -545,11 +561,11 @@ const SignupScreen = () => {
                     {isLoading ? (
                       <ActivityIndicator animating={true} color='white' />
                     ) : (
-                      <Text style={styles.buttonText}>Sign Up</Text> 
+                      <Text style={styles.buttonText}>Sign Up</Text>
                     )}
                   </TouchableOpacity>
                 </Animated.View>
-                  
+
                 <Animatable.View
                   animation='fadeIn'
                   duration={800}
@@ -572,7 +588,7 @@ const SignupScreen = () => {
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
-}; 
+};
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -598,7 +614,6 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.15,
     shadowRadius: 8,
-    elevation: 5,
   },
   // Hospital info styles
   hospitalInfoContainer: {
@@ -769,7 +784,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 20,
-    elevation: 3,
     shadowColor: "#1F75FE",
     shadowOffset: {
       width: 0,
@@ -827,6 +841,20 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 10,
+  },
+  passwordContainer: {
+    position: 'relative',
+    width: '100%',
+  },
+  passwordInput: {
+    paddingRight: 50,
+  },
+  eyeIcon: {
+    position: 'absolute',
+    right: 15,
+    top: '50%',
+    transform: [{ translateY: -12 }],
+    zIndex: 1,
   },
 });
 

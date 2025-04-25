@@ -2,9 +2,9 @@ import { createApi, fetchBaseQuery, BaseQueryFn } from "@reduxjs/toolkit/query/r
 import Constants from "expo-constants";
 import { RootState } from "../store";
 import { logout, setUser } from "../slices/authSlice";
-import { authApi } from "./authApi"; 
+import { authApi } from "./authApi";
 
-const API_BASE_URL = `${Constants.expoConfig?.extra?.API_BASE_URL}/stg_online-apmt`;
+const API_BASE_URL = `${Constants.expoConfig?.extra?.API_BASE_URL}/online-apmt`;
 
 interface ApiResponse {
   isSuccess: boolean;
@@ -56,12 +56,11 @@ const baseQueryWithReauth: BaseQueryFn = async (args, api, extraOptions) => {
       const refreshResult = await api.dispatch(authApi.endpoints.refreshToken.initiate(refreshToken));
 
       if ((refreshResult as any).data?.token) {
-        console.log("✅ Token refreshed successfully.");
 
-        api.dispatch(setUser({ 
-          ...api.getState().auth.user, 
-          token: refreshResult.data.token, 
-          refreshToken: refreshResult.data.refreshToken 
+        api.dispatch(setUser({
+          ...api.getState().auth.user,
+          token: refreshResult.data.token,
+          refreshToken: refreshResult.data.refreshToken
         }));
 
         // 🔄 Retry the original request with the new token
@@ -92,6 +91,14 @@ export const patientApi = createApi({
       }),
     }),
 
+    registerNewPatient: builder.mutation<ApiResponse, any>({
+      query: (patientData) => ({
+        url: `/patient-registration/registerNewPatient`,
+        method: "POST",
+        body: patientData,
+      }),
+    }),
+
     updatePatient: builder.mutation<ApiResponse, { id: string; updateData: any }>({
       query: ({ id, updateData }) => ({
         url: `/patient-registration/updatePatient/${id}`,
@@ -110,17 +117,15 @@ export const patientApi = createApi({
     // 🔍 Updated MRN Search Query
     searchPatientByMRN: builder.query<ApiResponse, string>({
       query: (mrn) => {
-        console.log("📡 API Request Sent with Params:", { searchBy: "mrn", search: mrn });
 
         return {
           url: `/patient-registration/searchPatientByKey`,
           method: "GET",
-          params: { searchBy: "mrn", search: mrn }, 
+          params: { searchBy: "mrn", search: mrn },
         };
       },
 
       transformResponse: (response: ApiResponse) => {
-        console.log("📡 Full API Response:", response);
         return response;
       },
 
@@ -130,7 +135,6 @@ export const patientApi = createApi({
           if (!data || !data.isSuccess || !data.data) {
             console.warn("❌ No Patient Found in API Response");
           } else {
-            console.log("✅ Patient Data Fetched Successfully:", data.data);
           }
         } catch (error) {
           console.error("❌ API Error in MRN Search:", error);
@@ -146,4 +150,5 @@ export const {
   useUpdatePatientMutation,
   useDeletePatientMutation,
   useSearchPatientByMRNQuery,
+  useRegisterNewPatientMutation
 } = patientApi;

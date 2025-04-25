@@ -143,9 +143,7 @@ const PatientUpdateScreen = () => {
 
     try {
       setIsUpdating(true);
-      console.log("📤 Sending Updated Data:", updatedData);
       const response = await updatePatient({ id: parsedPatientData._id, updateData: updatedData }).unwrap();
-      console.log("✅ Patient Updated Successfully:", response);
 
       dispatch(updatePatientInList(response.data));
 

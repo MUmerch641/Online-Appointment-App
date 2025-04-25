@@ -7,7 +7,7 @@ import { COLORS } from "@/constants/Colors";
 import Constants from "expo-constants";
 
 // Get API base URL from Constants
-const API_BASE_URL = `${Constants.expoConfig?.extra?.API_BASE_URL}/stg_online-apmt`;
+const API_BASE_URL = `${Constants.expoConfig?.extra?.API_BASE_URL}/online-apmt`;
 
 type PermissionStatus = 'undetermined' | 'granted' | 'denied';
 
@@ -87,8 +87,8 @@ const QRScannerScreen = () => {
       // Extract projectId from various URL patterns
       let projectId: string | null = null;
       
-      // 1. Main pattern for URLs like https://pakhims.com/stg_online-apmt/{projectId}/
-      const mainPattern = /\/stg_online-apmt\/([a-f0-9]{24})\/?/i;
+      // 1. Main pattern for URLs like https://pakhims.com/online-apmt/{projectId}/
+      const mainPattern = /\/online-apmt\/([a-f0-9]{24})\/?/i;
       const mainMatch = data.match(mainPattern);
       
       // 2. Fallback for any URL with a 24-character hex string after a slash

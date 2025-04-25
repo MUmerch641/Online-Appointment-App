@@ -22,7 +22,7 @@ interface AppointmentCardProps {
   onRetake: (appointment: any) => void
   onToken: (id: string) => void
   onCancel: (id: string) => void
-  onPrintData: (id: string) => void
+  // onPrintData: (id: string) => void
 }
 
 const formatDate = (dateString: string) => {
@@ -41,7 +41,7 @@ const formatDate = (dateString: string) => {
   }
 }
 
-const AppointmentCard = ({ appointment, onRetake, onToken, onCancel, onPrintData }: AppointmentCardProps) => {
+const AppointmentCard = ({ appointment, onRetake, onToken, onCancel }: AppointmentCardProps) => {
   return (
     <Card style={styles.card}>
       <View style={styles.headerContainer}>
