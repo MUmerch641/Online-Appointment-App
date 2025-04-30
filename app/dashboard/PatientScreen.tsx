@@ -215,7 +215,12 @@ const PatientsScreen = () => {
 
     router.push({
       pathname: "/appointments/CreateAppointmentScreen",
-      params: { patientId: patient._id },
+      params: { 
+        patientId: patient._id,
+        patientName: patient.patientName,
+        mrn: patient.mrn?.toString(),
+        phoneNumber: patient.phoneNumber || patient.phonNumber
+      },
     })
   }
 
@@ -246,9 +251,6 @@ const PatientsScreen = () => {
     setSearchKeyword("")
     searchInputRef.current?.focus()
   }
-
-
-  
 
   const headerTranslateY = headerAnimation.interpolate({
     inputRange: [0, 1],

@@ -108,7 +108,6 @@ const PatientRegistration: React.FC = () => {
         if (userDataString) {
           const parsedData = JSON.parse(userDataString);
           const userData = parsedData.user ? JSON.parse(parsedData.user) : null;
-          console.log("userData",userData)
           if (userData?.mobileNo) {
             setPhoneNumber(userData.mobileNo);
           }   

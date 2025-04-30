@@ -302,20 +302,29 @@ const CreateAppointmentScreen: React.FC = () => {
   const handleDoctorChange = (doctorId: string | null): void => {
     setSelectedDoctor(doctorId);
     setSelectedSlot(null);
-    setSelectedDate(null);
+  
+    // Set today's date by default
+    const todayString = TODAY_DATE_STRING;
+    setSelectedDate(todayString);
+  
     if (!doctorId) {
       setAvailableDates([]);
       setShowDoctorSelection(true);
       return;
     }
+  
     const doctorDetails = doctorsData?.data?.find((doc: Doctor) => doc._id === doctorId);
     if (!doctorDetails) {
       setAvailableDates([]);
       return;
     }
+  
     const availableDays = calculateAvailableDates(doctorDetails);
     setAvailableDates(availableDays);
     setShowDoctorSelection(false);
+  
+    // Remove the direct fetchSlots call - the existing useEffect will handle this
+    // when both selectedDoctor and selectedDate are set3
   };
 
   const handleBackToDoctorSelection = (): void => {
@@ -331,7 +340,7 @@ const CreateAppointmentScreen: React.FC = () => {
     const dayName = getStandardizedDayName(date);
     return selectedDoctorDetails.weeklySchedule.some(
       (schedule: Schedule) =>
-        schedule.day.toLowerCase() === dayName && schedule.timingScheedules && schedule.timingScheedules.length > 0
+        schedule?.day?.toLowerCase() === dayName && schedule.timingScheedules && schedule.timingScheedules.length > 0
     );
   };
 

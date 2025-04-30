@@ -147,16 +147,10 @@ export const authApi = createApi({
       // Transform successful response to ensure consistent structure
       transformResponse: (response: ApiResponse) => {
         
-        if (response?.message?.toLowerCase().includes("already registerd") || 
-            response?.message?.toLowerCase().includes("already registered") ||
-            response?.message?.toLowerCase().includes("already exists")) {
-          throw {
-            status: 400,
-            data: { message: 'Phone number already registered' }
-          };
-        }
+      
         
         if (response && !response.hasOwnProperty('isSuccess')) {
+
           return {
             isSuccess: true,
             data: response,

@@ -22,7 +22,7 @@ interface AppointmentCardProps {
   onRetake: (appointment: any) => void
   onToken: (id: string) => void
   onCancel: (id: string) => void
-  // onPrintData: (id: string) => void
+  onGeneratePDF: (appointment: any) => void
 }
 
 const formatDate = (dateString: string) => {
@@ -41,29 +41,27 @@ const formatDate = (dateString: string) => {
   }
 }
 
-const AppointmentCard = ({ appointment, onRetake, onToken, onCancel }: AppointmentCardProps) => {
+const AppointmentCard = ({
+  appointment,
+  onRetake,
+  onToken,
+  onCancel,
+  onGeneratePDF,
+}: AppointmentCardProps) => {
   return (
     <Card style={styles.card}>
       <View style={styles.headerContainer}>
+        <TouchableOpacity onPress={() => onGeneratePDF(appointment)} style={styles.pdfButton}>
+          <Ionicons name="document-outline" size={16} color="#333" />
+        </TouchableOpacity>
+
         <View style={styles.patientInfoContainer}>
           <Text style={styles.patientName}>{appointment.patientId.patientName}</Text>
           <Text style={styles.mrnText}>MRN: {appointment.patientId.mrn}</Text>
         </View>
 
         <View style={styles.actionButtonsContainer}>
-         
-     
-          {/* <TouchableOpacity
-            style={[styles.iconButton, styles.cancelButton]}
-            onPress={() => onCancel(appointment._id)}
-            disabled={appointment.isCanceled || appointment.isChecked}
-          >
-            <Ionicons
-              name="close"
-              size={16}
-              color={appointment.isCanceled || appointment.isChecked ? "gray" : "#FF1F1F"}
-            />
-          </TouchableOpacity> */}
+          {/* Optional actions can be added here */}
         </View>
       </View>
 
@@ -93,15 +91,12 @@ const AppointmentCard = ({ appointment, onRetake, onToken, onCancel }: Appointme
 
       <View style={styles.bottomButtonsContainer}>
         <TouchableOpacity style={styles.retakeButton} onPress={() => onRetake(appointment)}>
-          <Ionicons name="repeat-outline" size={18}  style={styles.buttonIconR} />
+          <Ionicons name="repeat-outline" size={18} style={styles.buttonIconR} />
           <Text style={styles.buttonText}>Retake Appointment</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.tokenButton}
-          onPress={() => onToken(appointment._id)}
-        >
-          <Ionicons name="receipt-outline" size={18} color={'grey'} style={styles.buttonIcon} />
+        <TouchableOpacity style={styles.tokenButton} onPress={() => onToken(appointment._id)}>
+          <Ionicons name="receipt-outline" size={18} color={"grey"} style={styles.buttonIcon} />
           <Text style={styles.buttonTextT}>Generate Token</Text>
         </TouchableOpacity>
       </View>
@@ -122,6 +117,16 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     padding: 12,
+    position: "relative",
+  },
+  pdfButton: {
+    position: "absolute",
+    right: 8,
+    top: 8,
+    padding: 6,
+    borderRadius: 4,
+    backgroundColor: "#f2f2f2",
+    zIndex: 2,
   },
   patientInfoContainer: {
     flex: 1,
@@ -175,7 +180,6 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 10,
   },
-  // Updated button styles with border and improved background colors
   retakeButton: {
     flex: 1,
     borderRadius: 8,
@@ -185,12 +189,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#388E3C", // Darker border
-    backgroundColor:'transparent'
+    borderColor: "#388E3C",
+    backgroundColor: "transparent",
   },
   tokenButton: {
     flex: 1,
-    backgroundColor: "transparent", // Blue background
+    backgroundColor: "transparent",
     borderRadius: 8,
     paddingVertical: 5,
     paddingHorizontal: 12,
@@ -198,24 +202,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "grey", // Darker border
+    borderColor: "grey",
   },
   buttonIconR: {
     marginRight: 6,
-    color: "#4CAF50", // Green background
-
+    color: "#4CAF50",
   },
   buttonIcon: {
     marginRight: 6,
-
   },
   buttonText: {
-    color: "#4CAF50", // Green background
+    color: "#4CAF50",
     fontSize: 11,
     fontWeight: "600",
   },
   buttonTextT: {
-    color:'grey',
+    color: "grey",
     fontSize: 11,
     fontWeight: "600",
   },

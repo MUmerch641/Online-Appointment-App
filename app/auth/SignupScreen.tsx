@@ -30,7 +30,6 @@ interface User {
   mobileNo: string;
   token: string;
   refreshToken: string;
-  // Add any other required fields
 }
 
 // Define a flexible ApiResponse type for handling different response structures
@@ -43,14 +42,14 @@ interface ApiResponse {
     token?: string;
     refreshToken?: string;
     [key: string]: any;
-  };
+  } | null;
   message?: string;
   token?: string;
   _id?: string;
   mobileNo?: string;
   fullName?: string;
   refreshToken?: string;
-  [key: string]: any; // Allow for additional properties
+  [key: string]: any;
 }
 
 // Define hospital info type
@@ -81,8 +80,8 @@ const SignupScreen = () => {
     data: hospitalData,
     isLoading: isLoadingHospital,
     error: hospitalError,
-    isError: isHospitalError
-  } = useGetHospitalByProjectIdQuery(projectId || '', {
+    isError: isHospitalError,
+  } = useGetHospitalByProjectIdQuery(projectId || "", {
     skip: !projectId,
   });
 
@@ -92,11 +91,8 @@ const SignupScreen = () => {
 
   // Prevent access without a valid project ID
   useEffect(() => {
-
-
     const validateProjectId = () => {
       if (!projectId) {
-        // No project ID provided
         setErrorMessage("Invalid access: No project ID found.");
         Alert.alert(
           "Invalid Access",
@@ -105,14 +101,13 @@ const SignupScreen = () => {
             {
               text: "Go Back",
               onPress: () => router.push("/auth/ScanQRScreen"),
-              style: "cancel"
-            }
+              style: "cancel",
+            },
           ]
         );
         return false;
       }
 
-      // Verify project ID format
       if (projectId.length !== 24) {
         setErrorMessage(`Invalid project ID length: ${projectId.length}`);
         Alert.alert(
@@ -122,14 +117,13 @@ const SignupScreen = () => {
             {
               text: "Scan QR Code",
               onPress: () => router.push("/auth/ScanQRScreen"),
-              style: "cancel"
-            }
+              style: "cancel",
+            },
           ]
         );
         return false;
       }
 
-      // Hex validation
       const hexPattern = /^[0-9a-f]{24}$/i;
       if (!hexPattern.test(projectId)) {
         setErrorMessage("Invalid project ID format");
@@ -140,22 +134,16 @@ const SignupScreen = () => {
             {
               text: "Scan QR Code",
               onPress: () => router.push("/auth/ScanQRScreen"),
-              style: "cancel"
-            }
+              style: "cancel",
+            },
           ]
         );
         return false;
       }
 
-      // If hospital query has an error or no data, project ID may be invalid
-      if (isHospitalError || (!hospitalData && !isLoadingHospital)) {
-        // We allow signup to continue even with hospital API errors
-      }
-
       return true;
     };
 
-    // Animate the form when component mounts
     Animated.parallel([
       Animated.timing(formOpacity, {
         toValue: 1,
@@ -178,7 +166,6 @@ const SignupScreen = () => {
     ]).start();
 
     if (!validateProjectId()) {
-      // If validation fails, redirect away from signup after a short delay
       setTimeout(() => {
         router.push("/auth/ScanQRScreen");
       }, 1500);
@@ -202,21 +189,16 @@ const SignupScreen = () => {
       styles.inputContainer,
       activeInput === inputName && {
         transform: [{ scale: 1.02 }],
-        borderColor: "#e0e0e0",
-        borderWidth: 1,
       },
-      // Add error style for phone number field if that's the error
       inputName === "mobileNo" &&
-      errorMessage &&
-      errorMessage.includes("Phone number already") &&
-      styles.errorInput,
+        errorMessage &&
+        errorMessage.includes("Phone number already registered") &&
+        styles.errorInput,
     ];
   };
 
-  // Handle mobile number input with prefix and character limit
   const handleMobileNoChange = (text: string) => {
     if (text.length <= 11) {
-      // Ensure "03" prefix is always there
       if (text.startsWith("03")) {
         setMobileNo(text);
       } else if (text.length >= 2) {
@@ -227,9 +209,7 @@ const SignupScreen = () => {
     }
   };
 
-  // Handle signup logic
   const handleSignup = async () => {
-    // Ensure project ID is present and valid
     if (!projectId || projectId.length !== 24) {
       Alert.alert(
         "Error",
@@ -239,8 +219,6 @@ const SignupScreen = () => {
       return;
     }
 
-
-    // Validate form fields
     if (!fullName.trim()) {
       setErrorMessage("Please enter your full name");
       return;
@@ -261,7 +239,6 @@ const SignupScreen = () => {
       return;
     }
 
-    // Prepare signup data
     const signupData = {
       fullName,
       mobileNo,
@@ -269,77 +246,55 @@ const SignupScreen = () => {
       projectId,
     };
 
-
-
     try {
       const response: ApiResponse = await registerUser(signupData).unwrap();
 
-      // Check registration response 
-      const isSuccess = response.isSuccess === true &&
-        !response.message?.toLowerCase().includes("already");
+      if (response.isSuccess === true ) {    
 
-      if (isSuccess) {
-
-        // Create a properly typed User object
-        const userData: User = {
-          _id: '',
-          fullName: '',
-          mobileNo: '',
-          token: '',
-          refreshToken: ''
-        };
-
-        // Extract user data from response based on its structure
         if (response.data) {
-          // If response has a data property containing user info
-          userData._id = response.data._id || '';
-          userData.fullName = response.data.fullName || '';
-          userData.mobileNo = response.data.mobileNo || '';
-          userData.token = response.data.token || '';
-          userData.refreshToken = response.data.refreshToken || '';
+          dispatch(setUser(response.data as User));
         } else {
-          // If response itself contains user data
-          userData._id = response._id || '';
-          userData.fullName = response.fullName || '';
-          userData.mobileNo = response.mobileNo || '';
-          userData.token = response.token || '';
-          userData.refreshToken = response.refreshToken || '';
+          throw new Error("Invalid user data received");
         }
-
-        // Store user data in Redux
-        dispatch(setUser(userData));
-
-        // Navigate to dashboard
-        router.replace("/dashboard/DashboardScreen");
+        router.replace("/dashboard/PatientScreen");
       } else {
-        // Handle registration failure
         const msg = response.message || "Signup failed. Please try again.";
         setErrorMessage(msg);
+        Alert.alert("Error", msg);
       }
     } catch (err: any) {
-      // Handle registration error
-      const errorMsg = err?.data?.message || "Signup failed. Please check your details.";
-      setErrorMessage(errorMsg);
 
-      // Special handling for existing phone number
-      if (errorMsg.includes("already registered") || errorMsg.includes("already exists")) {
+      const errorMsg = err?.data?.message || "Signup failed. Please try again.";
+      if (
+        errorMsg.toLowerCase().includes("phone number already registered") ||
+        errorMsg.toLowerCase().includes("already registered") ||
+        errorMsg.toLowerCase().includes("already exists")
+      ) {
+        setErrorMessage("Phone number already registered");
         Alert.alert(
           "Registration Error",
-          "This phone number is already registered.",
-          [{ text: "OK" }]
+          "Phone number already registered. Please login instead.",
+          [
+            {
+              text: "OK",
+              onPress: () => router.push("/auth/LoginScreen"),
+            },
+          ]
         );
+      } else {
+        setErrorMessage(errorMsg);
+        Alert.alert("Error", errorMsg);
       }
     }
   };
 
-  // Prevent rendering if no project ID
   if (!projectId) {
     return (
       <View style={styles.noProjectContainer}>
         <Text style={styles.errorTitle}>Access Denied</Text>
         <Text style={styles.errorMessage}>
-          You cannot access the signup page directly.
-          Please scan a valid QR code to proceed with registration.
+          You cannot access the signup page directly. Please scan a valid QR code
+          to proceed with registration.
         </Text>
         <TouchableOpacity
           style={styles.scanButton}
@@ -351,7 +306,6 @@ const SignupScreen = () => {
     );
   }
 
-  // Existing hospital data rendering logic
   const hospitalInfo = hospitalData?.data;
 
   return (
@@ -376,12 +330,18 @@ const SignupScreen = () => {
             >
               {isLoadingHospital ? (
                 <View style={styles.hospitalLoadingContainer}>
-                  <ActivityIndicator animating={true} color="#1F75FE" size="large" />
-                  <Text style={styles.loadingText}>Loading hospital information...</Text>
+                  <ActivityIndicator
+                    animating={true}
+                    color="#1F75FE"
+                    size="large"
+                  />
+                  <Text style={styles.loadingText}>
+                    Loading hospital information...
+                  </Text>
                 </View>
               ) : hospitalInfo ? (
                 <Animatable.View
-                  animation='fadeIn'
+                  animation="fadeIn"
                   duration={1000}
                   style={styles.hospitalInfoContainer}
                 >
@@ -398,7 +358,9 @@ const SignupScreen = () => {
                       </Text>
                     </View>
                   )}
-                  <Text style={styles.hospitalName}>{hospitalInfo.hospitalName}</Text>
+                  <Text style={styles.hospitalName}>
+                    {hospitalInfo.hospitalName}
+                  </Text>
                   {hospitalInfo.phoneNo && (
                     <Text style={styles.hospitalPhone}>
                       Contact: {hospitalInfo.phoneNo}
@@ -407,7 +369,7 @@ const SignupScreen = () => {
                 </Animatable.View>
               ) : (
                 <Animatable.View
-                  animation='bounceIn'
+                  animation="bounceIn"
                   duration={1200}
                   style={styles.logoContainer}
                 >
@@ -416,7 +378,7 @@ const SignupScreen = () => {
               )}
 
               <Animatable.Text
-                animation='fadeIn'
+                animation="fadeIn"
                 duration={800}
                 delay={300}
                 style={styles.title}
@@ -424,9 +386,8 @@ const SignupScreen = () => {
                 Signup Account
               </Animatable.Text>
 
-
               <Animatable.Text
-                animation='fadeIn'
+                animation="fadeIn"
                 duration={800}
                 delay={400}
                 style={styles.subtitle}
@@ -434,10 +395,9 @@ const SignupScreen = () => {
                 Enter your name, phone number & password to register.
               </Animatable.Text>
 
-              {/* Display error message if there is one */}
               {errorMessage && (
                 <Animatable.View
-                  animation='fadeIn'
+                  animation="fadeIn"
                   duration={300}
                   style={styles.errorContainer}
                 >
@@ -447,14 +407,14 @@ const SignupScreen = () => {
 
               <View style={styles.form}>
                 <Animatable.View
-                  animation='fadeInUp'
+                  animation="fadeInUp"
                   duration={800}
                   delay={500}
                   style={getInputContainerStyle("fullName")}
                 >
                   <Text style={styles.inputLabel}>Full Name</Text>
                   <TextInput
-                    placeholder='Enter Full Name'
+                    placeholder="Enter Full Name"
                     value={fullName}
                     onChangeText={setFullName}
                     style={styles.textInput}
@@ -464,32 +424,37 @@ const SignupScreen = () => {
                 </Animatable.View>
 
                 <Animatable.View
-                  animation='fadeInUp'
+                  animation="fadeInUp"
                   duration={800}
                   delay={600}
                   style={getInputContainerStyle("mobileNo")}
                 >
                   <Text style={styles.inputLabel}>Phone Number</Text>
                   <TextInput
-                    placeholder='Enter Phone Number'
-                    keyboardType='phone-pad'
+                    placeholder="Enter Phone Number"
+                    keyboardType="phone-pad"
                     value={mobileNo}
                     onChangeText={handleMobileNoChange}
                     style={[
                       styles.textInput,
-                      errorMessage && errorMessage.includes("Phone number already") && styles.inputError
+                      errorMessage &&
+                        errorMessage.includes("Phone number already registered") &&
+                        styles.inputError,
                     ]}
                     onFocus={() => handleInputFocus("mobileNo")}
                     onBlur={handleInputBlur}
                     maxLength={11}
                   />
-                  {errorMessage && errorMessage.includes("Phone number already") && (
-                    <Text style={styles.fieldErrorText}>This phone number is already registered</Text>
-                  )}
+                  {errorMessage &&
+                    errorMessage.includes("Phone number already registered") && (
+                      <Text style={styles.fieldErrorText}>
+                        Phone number already registered
+                      </Text>
+                    )}
                 </Animatable.View>
 
                 <Animatable.View
-                  animation='fadeInUp'
+                  animation="fadeInUp"
                   duration={800}
                   delay={700}
                   style={getInputContainerStyle("password")}
@@ -497,7 +462,7 @@ const SignupScreen = () => {
                   <Text style={styles.inputLabel}>Password</Text>
                   <View style={styles.passwordContainer}>
                     <TextInput
-                      placeholder='Enter Password'
+                      placeholder="Enter Password"
                       secureTextEntry={!passwordVisible}
                       value={password}
                       onChangeText={setPassword}
@@ -519,7 +484,7 @@ const SignupScreen = () => {
                 </Animatable.View>
 
                 <Animatable.View
-                  animation='fadeInUp'
+                  animation="fadeInUp"
                   duration={800}
                   delay={800}
                   style={getInputContainerStyle("confirmPassword")}
@@ -527,7 +492,7 @@ const SignupScreen = () => {
                   <Text style={styles.inputLabel}>Confirm Password</Text>
                   <View style={styles.passwordContainer}>
                     <TextInput
-                      placeholder='Confirm Password'
+                      placeholder="Confirm Password"
                       secureTextEntry={!confirmPasswordVisible}
                       value={confirmPassword}
                       onChangeText={setConfirmPassword}
@@ -540,14 +505,13 @@ const SignupScreen = () => {
                       onPress={() => setConfirmPasswordVisible(!confirmPasswordVisible)}
                     >
                       <Ionicons
-                        name={confirmPasswordVisible ? "eye-off" : "eye"}
+                        name={confirmPasswordVisible ? "eye" : "eye-off"}
                         size={24}
                         color="#666"
                       />
                     </TouchableOpacity>
                   </View>
                 </Animatable.View>
-
               </View>
 
               <View style={styles.bottomContainer}>
@@ -559,7 +523,7 @@ const SignupScreen = () => {
                     disabled={!projectId || isLoading}
                   >
                     {isLoading ? (
-                      <ActivityIndicator animating={true} color='white' />
+                      <ActivityIndicator animating={true} color="white" />
                     ) : (
                       <Text style={styles.buttonText}>Sign Up</Text>
                     )}
@@ -567,7 +531,7 @@ const SignupScreen = () => {
                 </Animated.View>
 
                 <Animatable.View
-                  animation='fadeIn'
+                  animation="fadeIn"
                   duration={800}
                   delay={1000}
                   style={styles.loginContainer}
@@ -589,6 +553,7 @@ const SignupScreen = () => {
     </KeyboardAvoidingView>
   );
 };
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -607,15 +572,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 30,
     marginVertical: 20,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
   },
-  // Hospital info styles
   hospitalInfoContainer: {
     alignItems: "center",
     marginBottom: 20,
@@ -666,7 +623,6 @@ const styles = StyleSheet.create({
     color: "#666",
     fontSize: 14,
   },
-  // Original styles
   logoContainer: {
     alignItems: "center",
     marginBottom: 20,
@@ -784,13 +740,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 20,
-    shadowColor: "#1F75FE",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
   },
   buttonText: {
     fontSize: 18,
@@ -817,22 +766,22 @@ const styles = StyleSheet.create({
   },
   noProjectContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: "#f8f9fa",
   },
   errorTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: COLORS.primary,
     marginBottom: 20,
-    textAlign: 'center',
+    textAlign: "center",
   },
   errorMessage: {
     fontSize: 16,
-    color: '#555',
-    textAlign: 'center',
+    color: "#555",
+    textAlign: "center",
     marginBottom: 30,
     paddingHorizontal: 20,
   },
@@ -843,16 +792,16 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   passwordContainer: {
-    position: 'relative',
-    width: '100%',
+    position: "relative",
+    width: "100%",
   },
   passwordInput: {
     paddingRight: 50,
   },
   eyeIcon: {
-    position: 'absolute',
+    position: "absolute",
     right: 15,
-    top: '50%',
+    top: "50%",
     transform: [{ translateY: -12 }],
     zIndex: 1,
   },
