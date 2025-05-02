@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,11 +12,11 @@ import {
   Easing,
   ListRenderItemInfo,
   Platform,
+  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSelector } from "react-redux";
 import { Ionicons } from "@expo/vector-icons";
-import { Card } from "react-native-paper";
 import { useFocusEffect } from "expo-router";
 import {
   useGetAllAppointmentsQuery,
@@ -30,302 +30,12 @@ import * as Print from "expo-print";
 import * as FileSystem from "expo-file-system";
 import * as MediaLibrary from "expo-media-library";
 import * as Sharing from "expo-sharing";
-import QRCode from "react-native-qrcode-svg";
 import axios from "axios";
 import { API_BASE_URL } from "@/config/apiConfig";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const onGeneratePDF = async (appointment: any) => {
-  try {
-    // Helper function to wrap long strings
-    const wrapString = (input: string, maxLength: number) => {
-      if (input.length > maxLength) {
-        return `${input.slice(0, maxLength)}...`;
-      }
-      return input;
-    };
-
-    // Helper function to capitalize names
-    const capitalizeName = (name: string) => {
-      return name
-        .split(" ")
-        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-        .join(" ");
-    };
-
-    // Fetch additional data (equivalent to fetchQrData)
-    const fetchQrData = async (id: string) => {
-      const url = `${API_BASE_URL}/online-appointment/generateToken/${id}`;
-      const userDataString = await AsyncStorage.getItem("persist:auth");
-      const parsedData = userDataString ? JSON.parse(userDataString) : null;
-      const userData = parsedData.user ? JSON.parse(parsedData.user) : null;
-      const token = userData?.token;
-      if (!token) {
-        throw new Error("No authentication token found");
-      }
-      try {
-        const response = await axios.post(url, {}, {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (response.data.isSuccess) {
-          return response.data.data;
-        } else {
-          throw new Error(response.data.message);
-        }
-      } catch (error) {
-        console.error("Error fetching QR data:", error);
-        return null;
-      }
-    };
-
-    // Fetch QR data
-    const res = await fetchQrData(appointment._id) || {
-      mrn: appointment.patientId.mrn,
-      patientName: appointment.patientId.patientName,
-      phonNumber: appointment.patientId.phonNumber || "N/A",
-      appointmentDate: formatDate(appointment.appointmentDate),
-      appointmentTime: { from: appointment.slot.split(" - ")[0] },
-      doctorName: appointment.doctor.fullName,
-      feeStatus: appointment.feeStatus || "N/A",
-      bookedServices: appointment.bookedServices || [],
-      discount: appointment.discount || 0,
-      tokenId: appointment._id.slice(0, 8),
-      visitId: appointment._id,
-    };
-    console.log("Fetched QR Data:", res);
-
-    // Generate QR code data URL (placeholder for now)
-    const qrCodeUrl = `https://pakhims.com/?MRN=${res.mrn}&visitId=${res.visitId}`;
-    // Placeholder base64 image (1x1 transparent PNG)
-    const qrCodeDataUrl =
-      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAgAB/w3K0ycAAAAASUVORK5CYII=";
-    console.log("Using placeholder QR code for testing");
-
-    // Calculate dynamic height for services
-    let additionalHeight = 0;
-    res.bookedServices.forEach((item: any) => {
-      const serviceNameLines =
-        item.serviceName.length / 30 > 1
-          ? Math.ceil(item.serviceName.length / 30)
-          : 1;
-      additionalHeight += (serviceNameLines - 1) * 5;
-    });
-    const heightPaper = 92 + res.bookedServices.length * 5 + additionalHeight;
-
-    // Generate HTML content for PDF
-    const htmlContent = `
-      <html>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <style>
-            body { font-family: Arial, sans-serif; margin: 0; font-size: 8px; width: 80mm; }
-            .header { background-color: #000; color: #fff; text-align: center; padding: 5px; }
-            .container { padding: 5px; }
-            .row { margin-bottom: 5px; }
-            .bold { font-weight: bold; }
-            .qr-code { margin: 10px 0; }
-            .table { width: 100%; margin-top: 5px; }
-            .table div { display: flex; justify-content: space-between; padding: 3px; }
-            .table-header { border-bottom: 1px solid #000; }
-            .table-row { border-bottom: 1px solid #000; }
-            .line { border-bottom: 1px solid #000; margin: 5px 0; }
-            .footer { margin-top: 10px; text-align: left; font-size: 8px; }
-            .paid { color: #bbb; font-size: 30px; text-align: center; transform: rotate(45deg); position: absolute; top: ${heightPaper / 1.5}mm; left: 30mm; opacity: 0.5; }
-            .rect { border: 1px solid #000; padding: 2px; margin: 5px 0; }
-            .token-circle { position: absolute; right: 5px; top: 20px; text-align: center; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div style="font-size: 10px;">${res.hospitalName || "Your Hospital Name"}</div>
-          </div>
-          <div class="container">
-            ${res.feeStatus === "paid" ? `<div class="paid">PAID</div>` : res.feeStatus === "insurance" ? `<div class="paid">INSURANCE</div>` : ""}
-            <div style="text-align: center; font-size: 8px; margin-top: 5px;">Hospital Phone # ${res.hospitalPhone || "N/A"}</div>
-            <div class="token-circle">
-              <div style="font-size: 10px; font-weight: bold;">Token</div>
-              <div style="font-size: 17px;"># ${res.tokenId}</div>
-            </div>
-            <div class="row" style="margin-top: 10px;">
-              <span class="bold">MRN #:</span>
-              <span style="margin-left: 10px;">${res.mrn}</span>
-            </div>
-            <div class="rect" style="height: 16mm;">
-              <div class="row" style="font-size: 9.5px;">
-                <span class="bold">Name:</span>
-                <span style="margin-left: 25mm;">${wrapString(capitalizeName(res.patientName), 17)}</span>
-              </div>
-              <div class="row">
-                <span class="bold">Phone #:</span>
-                <span style="margin-left: 25mm;">${res.phonNumber}</span>
-              </div>
-              <div class="row">
-                <span class="bold">Date & Time:</span>
-                <span style="margin-left: 25mm;">${res.appointmentDate} ${res.appointmentTime.from}</span>
-              </div>
-              <div class="row">
-                <span class="bold">Dr. Name:</span>
-                <span style="margin-left: 25mm;">${wrapString(capitalizeName(res.doctorName), 17)}</span>
-              </div>
-            </div>
-            <div class="table">
-              <div class="table-header">
-                <span class="bold">Services</span>
-                <span class="bold">Charges</span>
-              </div>
-              ${res.bookedServices
-        .map((item: any) => {
-          const serviceNameLines = item.serviceName.match(/.{1,30}/g) || [item.serviceName];
-          return serviceNameLines
-            .map(
-              (line: string, index: number) => `
-                      <div class="table-row">
-                        <span>${line}</span>
-                        ${index === 0 ? `<span>${item.fee}/-</span>` : "<span></span>"}
-                      </div>
-                    `
-            )
-            .join("");
-        })
-        .join("") || '<div class="table-row"><span>No services booked</span><span></span></div>'}
-            </div>
-            <div class="line"></div>
-            <div class="row">
-              <span class="bold">Gross Charges:</span>
-              <span style="margin-left: 25mm;">${res.bookedServices.reduce((sum: number, item: any) => sum + Number(item.fee), 0)}/-</span>
-            </div>
-            <div class="row">
-              <span class="bold">Fee Status:</span>
-              <span style="margin-left: 25mm;">${res.feeStatus}</span>
-            </div>
-            <div class="row">
-              <span class="bold">${res.feeStatus === "paid" ? "Paid Fee" : "Payable Fee"}:</span>
-              <span style="margin-left: 25mm;">${res.bookedServices.reduce((sum: number, item: any) => sum + Number(item.fee), 0) - res.discount}/-</span>
-            </div>
-            <div class="line"></div>
-            <div class="qr-code">
-              <img src="${qrCodeDataUrl}" width="20mm" height="20mm" />
-            </div>
-            <div class="footer">
-              Software By: Cure Logics, RYK
-            </div>
-          </div>
-        </body>
-      </html>
-    `;
-
-    // Generate PDF
-    const { uri } = await Print.printToFileAsync({
-      html: htmlContent,
-      width: 80 * 2.83465, // 80mm in points
-      height: heightPaper * 2.83465, // Dynamic height in points
-    });
-    console.log("Temporary PDF URI:", uri);
-
-    // Request storage permissions for Android
-    if (Platform.OS === "android") {
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== "granted") {
-        throw new Error("Storage permission is required to save files to Downloads folder.");
-      }
-    }
-
-    // Define file path
-    let fileUri = "";
-    const fileName = `Appointment_${res.visitId}.pdf`;
-
-    if (Platform.OS === "android") {
-      // First, move to cache directory
-      fileUri = `${FileSystem.cacheDirectory}${fileName}`;
-      await FileSystem.moveAsync({ from: uri, to: fileUri });
-      console.log("Moved to cache directory:", fileUri);
-
-      // Check if the file exists
-      const fileInfo = await FileSystem.getInfoAsync(fileUri);
-      if (!fileInfo.exists) {
-        throw new Error("Failed to create PDF file in cache directory.");
-      }
-      console.log("Cache file exists:", fileInfo);
-
-      // Try saving to Downloads using MediaLibrary
-      try {
-        const asset = await MediaLibrary.createAssetAsync(fileUri);
-        await MediaLibrary.createAlbumAsync("Download", asset, false);
-        fileUri = `Downloads/${fileName}`;
-        console.log("Saved to Downloads via MediaLibrary:", fileUri);
-      } catch (mediaError) {
-        console.error("MediaLibrary failed:", mediaError);
-        // Fallback to StorageAccessFramework
-        const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
-        if (permissions.granted) {
-          const base64 = await FileSystem.readAsStringAsync(fileUri, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-          fileUri = await FileSystem.StorageAccessFramework.createFileAsync(
-            permissions.directoryUri,
-            fileName,
-            "application/pdf"
-          );
-          await FileSystem.writeAsStringAsync(fileUri, base64, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-          fileUri = `Downloads/${fileName}`;
-          console.log("Saved to Downloads via StorageAccessFramework:", fileUri);
-        } else {
-          throw new Error("Storage access permission denied.");
-        }
-      }
-    } else {
-      // iOS: Save to document directory
-      fileUri = `${FileSystem.documentDirectory}${fileName}`;
-      await FileSystem.moveAsync({ from: uri, to: fileUri });
-      console.log("Saved to document directory:", fileUri);
-    }
-
-    // Verify the file was saved
-    const savedFileInfo = await FileSystem.getInfoAsync(fileUri);
-    if (!savedFileInfo.exists && Platform.OS === "ios") {
-      throw new Error("Failed to verify saved PDF file in document directory.");
-    }
-    console.log("Saved file info:", savedFileInfo);
-
-    // Show success message
-    Alert.alert(
-      "Success",
-      `PDF file saved to: ${fileUri}${Platform.OS === "ios" ? "\nYou can share it to save to another location." : ""}`,
-      [
-        { text: "OK", style: "cancel" },
-        ...(Platform.OS === "ios"
-          ? [
-              {
-                text: "Share",
-                onPress: async () => {
-                  if (await Sharing.isAvailableAsync()) {
-                    await Sharing.shareAsync(fileUri, {
-                      mimeType: "application/pdf",
-                      dialogTitle: "Share PDF",
-                    });
-                  } else {
-                    Alert.alert("Error", "Sharing not available on this device.");
-                  }
-                },
-              },
-            ]
-          : []),
-      ]
-    );
-  } catch (error) {
-    console.error("PDF Generation/Save Error:", error);
-    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
-    Alert.alert("Error", `Failed to generate or save PDF: ${errorMessage}`);
-  }
-};
-
 // Helper function to format date
-const formatDate = (dateString: string) => {
+const formatDate = (dateString: string): string => {
   if (!dateString) return "N/A";
   try {
     const date = new Date(dateString);
@@ -341,7 +51,144 @@ const formatDate = (dateString: string) => {
   }
 };
 
-// Rest of your DashboardScreen code remains unchanged
+// Helper function to wrap long strings
+const wrapString = (input: string, maxLength: number): string => {
+  if (!input) return "";
+  if (input.length > maxLength) {
+    return `${input.slice(0, maxLength)}...`;
+  }
+  return input;
+};
+
+// Helper function to capitalize names
+const capitalizeName = (name: string): string => {
+  if (!name) return "";
+  return name
+    .split(" ")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+};
+
+// Generate fallback QR code using Google Charts API
+const generateQRCode = (url: string): string => {
+  return `https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(url)}`;
+};
+
+// Helper function to get default QR data
+const getDefaultQrData = (appointment: any, userData?: any) => {
+  return {
+    mrn: appointment?.patientId?.mrn || "N/A",
+    patientName: appointment?.patientId?.patientName || "Unknown",
+    phonNumber: appointment?.patientId?.phonNumber || "N/A",
+    visitId: appointment?._id || "N/A",
+    tokenId: appointment?._id?.slice(0, 8) || "N/A",
+
+    visitNo: "N/A",
+    appointmentDate: formatDate(appointment?.appointmentDate) || "N/A",
+    appointmentTime: { from: appointment?.slot?.split(" - ")[0] || "N/A" },
+    doctorName: appointment?.doctor?.fullName || "N/A",
+    feeStatus: appointment?.feeStatus || "pending",
+    bookedServices: Array.isArray(appointment?.bookedServices) ? appointment.bookedServices : [],
+    discount: appointment?.discount || 0,
+    hospitalName: userData?.hospital?.hospitalName || "Your Hospital Name",
+    hospitalPhone: userData?.hospital?.phoneNo || "N/A",
+  };
+};
+
+const fetchQrData = async (id: string, userData: User | null) => {
+  try {
+    const token = userData?.token;
+    if (!token) {
+      Alert.alert("Error", "Authentication token not found");
+      return null;
+    }
+
+    const response = await axios.post(
+      `${API_BASE_URL}/online-appointment/generateToken/${id}`,
+      {},
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    console.log("Token generation response:", response.data);
+    
+    if (response.data.isSuccess) {
+      return response.data.data;
+    } else {
+      throw new Error(response.data.message || "Failed to generate token");
+    }
+  } catch (error) {
+    console.error("Error generating token:", error);
+    Alert.alert("Error", "Failed to generate token");
+    return null;
+  }
+};
+
+// Helper function to fetch prescription data
+const fetchPrescriptionData = async (appointmentId: string, userData: User | null) => {
+  try {
+    const token = userData?.token;
+    if (!token) {
+      Alert.alert("Error", "Authentication token not found");
+      return null;
+    }
+
+    const response = await axios.get(
+      `${API_BASE_URL}/online-appointment/getPrescripByAppointmentId/${appointmentId}`,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    console.log("Prescription data response:", response.data);
+    
+    if (response.data.isSuccess) {
+      return response.data.data;
+    } else {
+      throw new Error(response.data.message || "Failed to fetch prescription");
+    }
+  } catch (error) {
+    console.error("Error fetching prescription:", error);
+    Alert.alert("Error", "Failed to fetch prescription data");
+    return null;
+  }
+};
+
+// Helper function to calculate total fee from services
+const calculateTotalFee = (services: any[] | undefined): number => {
+  if (!Array.isArray(services)) return 0;
+  return services.reduce((total, service) => total + (service?.fee || 0), 0);
+};
+
+// Helper function to calculate age from date of birth
+const calculateAge = (dob: string): string => {
+  if (!dob) return "N/A";
+  
+  try {
+    const birthDate = new Date(dob);
+    const today = new Date();
+    
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    return age.toString();
+  } catch (e) {
+    return "N/A";
+  }
+};
+
+// Dashboard Screen Component
 interface Patient {
   _id: string;
   patientName: string;
@@ -369,6 +216,10 @@ interface Appointment {
   isApmtCanceled: boolean;
   isPrescriptionCreated: boolean;
   cancel_reason?: string;
+  slot: string;
+  feeStatus: string;
+  bookedServices?: { serviceName: string; fee: number }[];
+  discount?: number;
 }
 
 interface ItemAnimation {
@@ -379,6 +230,7 @@ interface ItemAnimation {
 interface User {
   fullName: string;
   token?: string;
+  hospital?: { hospitalName: string; phoneNo: string; address?: string; logoUrl?: string };
 }
 
 const DashboardScreen = () => {
@@ -386,6 +238,7 @@ const DashboardScreen = () => {
   const user = useSelector(selectUser) as User | null;
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [instructionsVisible, setInstructionsVisible] = useState<boolean>(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(20)).current;
@@ -396,8 +249,6 @@ const DashboardScreen = () => {
   const { data: appointmentsData, refetch, isLoading } = useGetAllAppointmentsQuery(
     { search: searchQuery || "" }
   );
-  const [instructionsVisible, setInstructionsVisible] = useState<boolean>(false);
-
   const [cancelAppointment] = useCancelAppointmentMutation();
 
   useFocusEffect(
@@ -420,7 +271,7 @@ const DashboardScreen = () => {
           duration: 600,
           easing: Easing.out(Easing.back(1.5)),
           useNativeDriver: true,
-        })
+        }),
       ]).start();
     }, [])
   );
@@ -448,15 +299,15 @@ const DashboardScreen = () => {
               toValue: 1,
               duration: 300,
               delay,
-              useNativeDriver: true
+              useNativeDriver: true,
             }),
             Animated.timing(animations.translateY, {
               toValue: 0,
               duration: 300,
               delay,
               easing: Easing.out(Easing.cubic),
-              useNativeDriver: true
-            })
+              useNativeDriver: true,
+            }),
           ]).start();
         }
       });
@@ -482,7 +333,7 @@ const DashboardScreen = () => {
 
   const spin = spinValue.interpolate({
     inputRange: [0, 1],
-    outputRange: ['0deg', '360deg']
+    outputRange: ["0deg", "360deg"],
   });
 
   const animateRefresh = (): void => {
@@ -491,7 +342,7 @@ const DashboardScreen = () => {
       toValue: 1,
       duration: 800,
       easing: Easing.linear,
-      useNativeDriver: true
+      useNativeDriver: true,
     }).start();
   };
 
@@ -523,7 +374,7 @@ const DashboardScreen = () => {
             try {
               await cancelAppointment({
                 id: appointmentId,
-                cancel_reason: reason
+                cancel_reason: reason,
               }).unwrap();
               Alert.alert("Success", "Appointment cancelled successfully.");
               refetchAppointments();
@@ -547,7 +398,7 @@ const DashboardScreen = () => {
         doctorId: appointment.doctorId,
         doctorName: appointment.doctor?.fullName,
         date: appointment.appointmentDate,
-        timeSlotId: appointment.timeSlotId
+        timeSlotId: appointment.timeSlotId,
       },
     });
   };
@@ -560,43 +411,34 @@ const DashboardScreen = () => {
 
     router.push({
       pathname: "/appointments/AppointmentReciept",
-      params: { appointmentId }
+      params: { appointmentId },
     });
   };
 
-  const formatDate = (dateString: string): string => {
-    if (!dateString) return "N/A";
+  const handleViewPrescription = async (appointmentId: string) => {
     try {
-      const options: Intl.DateTimeFormatOptions = {
-        month: 'short',
-        day: 'numeric'
-      };
-      return new Date(dateString).toLocaleDateString(undefined, options);
+      // Fetch prescription data
+      const prescriptionData = await fetchPrescriptionData(appointmentId, user);
+      
+      if (!prescriptionData) {
+        Alert.alert("Info", "No prescription found for this appointment");
+        return;
+      }
+      
+      // Find the appointment data
+      const appointment = appointmentsData?.data?.find(item => item._id === appointmentId);
+      
+      if (!appointment) {
+        Alert.alert("Error", "Appointment data not found");
+        return;
+      }
+      
+      // Generate PDF with the prescription data
+      await generatePrescriptionPDF(prescriptionData, appointment);
     } catch (error) {
-      return "Invalid date";
+      console.error("Error viewing prescription:", error);
+      Alert.alert("Error", "Failed to load prescription");
     }
-  };
-
-  const onRefresh = (): void => {
-    refetchAppointments();
-  };
-
-  const parseTimeString = (timeStr: string) => {
-    const timeRegex = /(\d+):(\d+)(?:\s*(AM|PM))?/i;
-    const match = timeStr.match(timeRegex);
-
-    if (match) {
-      let hours = parseInt(match[1]);
-      const minutes = parseInt(match[2]);
-      const period = match[3]?.toUpperCase();
-
-      if (period === "PM" && hours < 12) hours += 12;
-      if (period === "AM" && hours === 12) hours = 0;
-
-      return { hours, minutes };
-    }
-
-    return null;
   };
 
   const isAppointmentExpired = (appointment: Appointment): boolean => {
@@ -615,10 +457,17 @@ const DashboardScreen = () => {
 
     if (appointmentDate.getTime() === today.getTime()) {
       const timeStr = appointment.appointmentTime.from;
-      const parsedTime = parseTimeString(timeStr);
+      const timeRegex = /(\d+):(\d+)(?:\s*(AM|PM))?/i;
+      const match = timeStr.match(timeRegex);
 
-      if (parsedTime) {
-        const { hours, minutes } = parsedTime;
+      if (match) {
+        let hours = parseInt(match[1]);
+        const minutes = parseInt(match[2]);
+        const period = match[3]?.toUpperCase();
+
+        if (period === "PM" && hours < 12) hours += 12;
+        if (period === "AM" && hours === 12) hours = 0;
+
         const appointmentTime = new Date();
         appointmentTime.setHours(hours, minutes, 0, 0);
 
@@ -629,46 +478,459 @@ const DashboardScreen = () => {
     return false;
   };
 
+  const onRefresh = (): void => {
+    refetchAppointments();
+  };
+
+  const onGeneratePDF = async (appointment: any) => {
+    try {
+      // Get appointment ID
+      const appointmentId = appointment._id;
+      if (!appointmentId) {
+        Alert.alert("Error", "Invalid appointment ID");
+        return;
+      }
+      
+      // First check if prescription is available for this appointment
+      const prescriptionData = appointment.isPrescriptionCreated ? 
+        await fetchPrescriptionData(appointmentId, user) : null;
+      
+      // If prescription data is available, use it for PDF generation, otherwise fetch token data
+      if (prescriptionData) {
+        await generatePrescriptionPDF(prescriptionData, appointment);
+      } else {
+        // Fetch token data and generate regular token PDF
+        const tokenData = await fetchQrData(appointmentId, user);
+        
+        if (!tokenData) {
+          return; // Error already handled in fetchQrData
+        }
+        
+        await generateTokenPDF(tokenData);
+      }
+    } catch (error) {
+      console.error("PDF Generation Error:", error);
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+      Alert.alert("Error", `Failed to generate PDF: ${errorMessage}`);
+    }
+  };
+
+  const generatePrescriptionPDF = async (prescriptionData: any, appointment: any) => {
+    try {
+      // Generate QR code URL using Google Charts API
+      const qrCodeUrl = `https://pakhims.com/?MRN=${encodeURIComponent(prescriptionData.patientData?.[0]?.mrn || "")}&visitId=${encodeURIComponent(appointment._id)}`;
+      const qrCodeDataUrl = generateQRCode(qrCodeUrl);
+      
+      // Get patient data
+      const patient = prescriptionData.patientData?.[0] || {};
+      
+      // Get header and footer URLs
+      const headerUrl = prescriptionData.headerUrl || "";
+      const footerUrl = prescriptionData.footerUrl || "";
+      const signature = prescriptionData.signature || "";
+      const stamp = prescriptionData.stamp || "";
+      
+      // Set visit number
+      const visitNo = prescriptionData.visit_no || 1;
+      
+      // Generate HTML content for PDF with header and footer images
+      const htmlContent = `
+        <html>
+          <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+              body { font-family: Arial, sans-serif; margin: 0; font-size: 8px; width: 210mm; }
+              .header-image { width: 100%; max-height: 80px; object-fit: contain; }
+              .footer-image { width: 100%; max-height: 50px; object-fit: contain; margin-top: 10px; }
+              .container { padding: 10px; position: relative; }
+              .patient-info { border: 1px solid #000; padding: 10px; margin-bottom: 15px; }
+              .info-row { display: flex; margin-bottom: 5px; }
+              .info-label { font-weight: bold; width: 120px; }
+              .qr-code { text-align: center; margin-top: 20px; }
+              .signature-section { display: flex; justify-content: flex-end; margin-top: 20px; text-align: center; }
+              .signature-image { max-width: 150px; max-height: 60px; }
+              .stamp-image { max-width: 100px; max-height: 100px; margin-left: 20px; }
+            </style>
+          </head>
+          <body>
+            ${headerUrl ? `<img src="${headerUrl}" class="header-image" />` : ''}
+            <div class="container">
+              <div class="patient-info">
+                <div class="info-row">
+                  <span class="info-label">Patient Name:</span>
+                  <span>${patient.patientName || "N/A"}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">MRN:</span>
+                  <span>${patient.mrn || "N/A"}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Gender/Age:</span>
+                  <span>${patient.gender || "N/A"} / ${calculateAge(patient.dob) || "N/A"}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Phone:</span>
+                  <span>${patient.phonNumber || "N/A"}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Visit Number:</span>
+                  <span>${visitNo}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Date:</span>
+                  <span>${formatDate(new Date().toISOString())}</span>
+                </div>
+              </div>
+              
+              <h2>Prescription</h2>
+              <p>This is a summary of your visit. Please follow the instructions provided by your doctor.</p>
+              
+              <div class="signature-section">
+                ${signature ? `<img src="${signature}" class="signature-image" />` : ''}
+                ${stamp ? `<img src="${stamp}" class="stamp-image" />` : ''}
+              </div>
+              
+              <div class="qr-code">
+                <img src="${qrCodeDataUrl}" width="80px" height="80px" />
+                <p>Scan to view digital record</p>
+              </div>
+            </div>
+            ${footerUrl ? `<img src="${footerUrl}" class="footer-image" />` : ''}
+          </body>
+        </html>
+      `;
+
+      // Generate PDF
+      const { uri } = await Print.printToFileAsync({
+        html: htmlContent,
+        width: 210 * 2.83465, // A4 width in points
+        height: 297 * 2.83465, // A4 height in points
+      });
+
+      // Save/share the PDF
+      const fileName = `Prescription_${patient.mrn || "unknown"}.pdf`;
+      showPDFOptions(uri, fileName);
+    } catch (error) {
+      console.error("Prescription PDF Generation Error:", error);
+      throw error;
+    }
+  };
+
+  const generateTokenPDF = async (tokenData: any) => {
+    try {
+      // Generate QR code URL using Google Charts API
+      const qrCodeUrl = `https://pakhims.com/?MRN=${encodeURIComponent(tokenData.mrn)}&visitId=${encodeURIComponent(tokenData.visitId)}`;
+      const qrCodeDataUrl = generateQRCode(qrCodeUrl);
+      
+      // Calculate dynamic height for services
+      let additionalHeight = 0;
+      const bookedServices = Array.isArray(tokenData.bookedServices) ? tokenData.bookedServices : [];
+      
+      bookedServices.forEach((item: any) => {
+        if (!item || !item.serviceName) return;
+        const serviceNameLines =
+          item.serviceName.length / 30 > 1
+            ? Math.ceil(item.serviceName.length / 30)
+            : 1;
+        additionalHeight += (serviceNameLines - 1) * 5;
+      });
+      
+      const heightPaper = 92 + (bookedServices.length * 5) + additionalHeight;
+
+      // Get hospital info
+      const hospitalName = user?.hospital?.hospitalName || "Your Hospital";
+      const hospitalPhone = user?.hospital?.phoneNo || tokenData.hospitalPhone || "N/A";
+      const hospitalAddress = user?.hospital?.address || tokenData.hospitalAddress || "Hospital Address";
+      const hospitalLogo = user?.hospital?.logoUrl || "";
+
+      // Generate HTML content for PDF with improved header/footer
+      const htmlContent = `
+        <html>
+          <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+              body { font-family: Arial, sans-serif; margin: 0; font-size: 8px; width: 80mm; }
+              .header { background-color: #000; color: #fff; text-align: center; padding: 8px 5px; }
+              .header-logo { max-height: 30px; margin-bottom: 3px; }
+              .container { padding: 5px; position: relative; }
+              .row { margin-bottom: 5px; }
+              .bold { font-weight: bold; }
+              .qr-code { margin-top: 10px; text-align: center; }
+              .table { width: 100%; margin-top: 5px; }
+              .table div { display: flex; justify-content: space-between; padding: 3px; }
+              .table-header { border-bottom: 1px solid #000; font-weight: bold; }
+              .table-row { border-bottom: 1px solid #000; }
+              .table-footer { border-top: 1px solid #000; font-weight: bold; }
+              .line { border-bottom: 1px solid #000; margin: 5px 0; }
+              .footer { margin-top: 10px; text-align: center; font-size: 7px; padding-top: 5px; border-top: 1px dashed #000; }
+              .paid { color: #bbb; font-size: 50px; text-align: center; transform: rotate(45deg); position: absolute; top: ${heightPaper / 1.5}mm; left: 30mm; opacity: 0.5; }
+              .rect { border: 1px solid #000; padding: 4px; margin: 5px 0; width: 75mm; }
+              .token { position: absolute; right: 5px; top: 15px; text-align: center; }
+              .contact-info { text-align: center; font-size: 7px; margin: 3px 0; }
+              .total-row { font-weight: bold; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              ${hospitalLogo ? `<img src="${hospitalLogo}" class="header-logo" alt="Hospital Logo" /><br/>` : ''}
+              <div style="font-size: 10px; font-weight: bold;">${hospitalName}</div>
+              <div class="contact-info">${hospitalAddress}</div>
+              <div class="contact-info">Phone: ${hospitalPhone}</div>
+            </div>
+            <div class="container">
+              ${
+                tokenData.feeStatus === "paid"
+                  ? `<div class="paid">PAID</div>`
+                  : tokenData.feeStatus === "insurance"
+                  ? `<div class="paid">INSURANCE</div>`
+                  : ""
+              }
+              <div class="token">
+                <div style="font-size: 10px; font-weight: bold;">Token</div>
+                <div style="font-size: 17px;"># ${tokenData.tokenId || "N/A"}</div>
+              </div>
+              <div class="row" style="margin-top: 10px;">
+                <span class="bold" style="margin-left: 2mm;">MRN #:</span>
+                <span style="margin-left: 13mm;">${tokenData.mrn || "N/A"}</span>
+              </div>
+              <div class="rect">
+                <div class="row" style="font-size: 9.5px;">
+                  <span class="bold" style="margin-left: 3mm;">Name:</span>
+                  <span style="margin-left: 35mm;">${wrapString(capitalizeName(tokenData.patientName || ""), 17)}</span>
+                </div>
+                <div class="row">
+                  <span class="bold" style="margin-left: 3mm;">Phone #:</span>
+                  <span style="margin-left: 35mm;">${tokenData.phonNumber || "N/A"}</span>
+                </div>
+                <div class="row">
+                  <span class="bold" style="margin-left: 3mm;">Date & Time:</span>
+                  <span style="margin-left: 35mm;">${formatDate(tokenData.appointmentDate) || "N/A"}</span>
+                  <span style="margin-left: 57mm;">${tokenData.appointmentTime?.from || "N/A"}</span>
+                </div>
+                <div class="row">
+                  <span class="bold" style="margin-left: 3mm;">Dr. Name:</span>
+                  <span style="margin-left: 35mm;">${wrapString(capitalizeName(tokenData.doctorName || ""), 17)}</span>
+                </div>
+                <div class="row">
+                  <span class="bold" style="margin-left: 3mm;">Visit ID:</span>
+                  <span style="margin-left: 35mm;">${tokenData.visitId || "N/A"}</span>
+                </div>
+              </div>
+              <div class="table">
+                <div class="table-header">
+                  <span style="margin-left: 2mm;">Services</span>
+                  <span style="margin-right: 2mm;">Charges</span>
+                </div>
+                ${
+                  Array.isArray(tokenData.bookedServices) && tokenData.bookedServices.length > 0
+                    ? tokenData.bookedServices
+                        .map((item: any) => {
+                          if (!item || !item.serviceName) return '';
+                          const serviceNameLines =
+                            item.serviceName?.match(/.{1,30}/g) || ["N/A"];
+                          return serviceNameLines
+                            .map(
+                              (line: string, index: number) => `
+                                <div class="table-row">
+                                  <span style="margin-left: 2mm;">${line || ""}</span>
+                                  ${
+                                    index === 0
+                                      ? `<span style="margin-right: 2mm;">${item.fee || 0}/-</span>`
+                                      : "<span></span>"
+                                  }
+                                </div>
+                              `
+                            )
+                            .join("");
+                        })
+                        .join("")
+                    : '<div class="table-row"><span style="margin-left: 2mm;">No services booked</span><span></span></div>'
+                }
+                <div class="table-footer">
+                  <span style="margin-left: 2mm;">Total Fee:</span>
+                  <span style="margin-right: 2mm;">${tokenData.totalFee || calculateTotalFee(tokenData.bookedServices) || 0}/-</span>
+                </div>
+                ${tokenData.discount > 0 ? `
+                  <div class="table-row">
+                    <span style="margin-left: 2mm;">Discount:</span>
+                    <span style="margin-right: 2mm;">${tokenData.discount || 0}/-</span>
+                  </div>
+                  <div class="total-row">
+                    <span style="margin-left: 2mm;">Net Payable:</span>
+                    <span style="margin-right: 2mm;">${(tokenData.totalFee || calculateTotalFee(tokenData.bookedServices) || 0) - (tokenData.discount || 0)}/-</span>
+                  </div>
+                ` : ''}
+              </div>
+              <div class="row" style="margin-top: 5px;">
+                <span class="bold" style="margin-left: 2mm;">Fee Status:</span>
+                <span style="margin-left: 15mm; text-transform: uppercase;">${tokenData.feeStatus || "pending"}</span>
+              </div>
+              <div class="line"></div>
+              <div class="qr-code">
+                <img src="${qrCodeDataUrl}" width="20mm" height="20mm" />
+                <div style="font-size: 7px; margin-top: 3px;">Scan to view digital record</div>
+              </div>
+              <div class="footer">
+                <div>Software Powered by PakHIMS - Hospital Information Management System</div>
+                <div>© ${new Date().getFullYear()} Cure Logics, Rahim Yar Khan</div>
+                <div>www.pakhims.com | support@pakhims.com</div>
+              </div>
+            </div>
+          </body>
+        </html>
+      `;
+
+      // Generate PDF
+      const { uri } = await Print.printToFileAsync({
+        html: htmlContent,
+        width: 80 * 2.83465, // 80mm in points
+        height: heightPaper * 2.83465, // Dynamic height in points
+      });
+
+      // Save/share the PDF
+      const fileName = `Token_${tokenData.tokenId || tokenData.visitId || "unknown"}.pdf`;
+      showPDFOptions(uri, fileName);
+    } catch (error) {
+      console.error("Token PDF Generation Error:", error);
+      throw error;
+    }
+  };
+
+  const showPDFOptions = (uri: string, fileName: string) => {
+    Alert.alert(
+      "PDF Generated",
+      "What would you like to do with the PDF?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+          onPress: async () => {
+            try {
+              await FileSystem.deleteAsync(uri, { idempotent: true });
+            } catch (error) {
+              console.warn("Failed to delete temporary file:", error);
+            }
+          },
+        },
+        {
+          text: "Share",
+          onPress: async () => {
+            if (await Sharing.isAvailableAsync()) {
+              await Sharing.shareAsync(uri, {
+                mimeType: "application/pdf",
+                dialogTitle: "Share PDF",
+              });
+            } else {
+              Alert.alert("Error", "Sharing not available on this device.");
+            }
+            try {
+              await FileSystem.deleteAsync(uri, { idempotent: true });
+            } catch (error) {
+              console.warn("Failed to delete temporary file:", error);
+            }
+          },
+        },
+        {
+          text: "Save",
+          onPress: async () => {
+            let fileUri = "";
+            if (Platform.OS === "android") {
+              try {
+                const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+                if (permissions.granted) {
+                  const base64 = await FileSystem.readAsStringAsync(uri, {
+                    encoding: FileSystem.EncodingType.Base64,
+                  });
+                  fileUri = await FileSystem.StorageAccessFramework.createFileAsync(
+                    permissions.directoryUri,
+                    fileName,
+                    "application/pdf"
+                  );
+                  await FileSystem.writeAsStringAsync(fileUri, base64, {
+                    encoding: FileSystem.EncodingType.Base64,
+                  });
+                  Alert.alert("Success", `PDF saved to selected location: ${fileName}`);
+                } else {
+                  Alert.alert("Error", "Storage access permission denied.");
+                  fileUri = `${FileSystem.documentDirectory}${fileName}`;
+                  await FileSystem.moveAsync({ from: uri, to: fileUri });
+                  Alert.alert(
+                    "Fallback",
+                    `Saved to app's document directory: ${fileUri}`
+                  );
+                }
+              } catch (error) {
+                console.error("Save error:", error);
+                fileUri = `${FileSystem.documentDirectory}${fileName}`;
+                await FileSystem.moveAsync({ from: uri, to: fileUri });
+                Alert.alert(
+                  "Fallback",
+                  `Failed to save to selected location. Saved to: ${fileUri}`
+                );
+              }
+            } else {
+              fileUri = `${FileSystem.documentDirectory}${fileName}`;
+              await FileSystem.moveAsync({ from: uri, to: fileUri });
+              Alert.alert(
+                "Success",
+                `PDF saved to: ${fileUri}\nYou can share it to save to another location.`,
+                [
+                  { text: "OK", style: "cancel" },
+                  {
+                    text: "Share",
+                    onPress: async () => {
+                      if (await Sharing.isAvailableAsync()) {
+                        await Sharing.shareAsync(fileUri, {
+                          mimeType: "application/pdf",
+                          dialogTitle: "Share PDF",
+                        });
+                      } else {
+                        Alert.alert("Error", "Sharing not available on this device.");
+                      }
+                    },
+                  },
+                ]
+              );
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
   const renderAppointmentItem = ({ item, index }: ListRenderItemInfo<Appointment>): React.ReactElement => {
     const animations = itemAnimations.get(item._id) || {
       fadeAnim: new Animated.Value(1),
-      translateY: new Animated.Value(0)
+      translateY: new Animated.Value(0),
     };
 
     return (
       <Animated.View
-        style={[
-          { opacity: animations.fadeAnim, transform: [{ translateY: animations.translateY }] }
-        ]}
+        style={[{ opacity: animations.fadeAnim, transform: [{ translateY: animations.translateY }] }]}
       >
         <AppointmentCard
           appointment={{
             _id: item._id,
             patientId: {
               patientName: item.patientId?.patientName || "Unknown",
-              mrn: item.patientId?.mrn || "N/A"
+              mrn: item.patientId?.mrn || "N/A",
             },
             doctor: {
-              fullName: item.doctor?.fullName || "Not assigned"
+              fullName: item.doctor?.fullName || "Not assigned",
             },
             appointmentDate: item.appointmentDate,
-            slot: item.appointmentTime
-              ? `${item.appointmentTime.from} - ${item.appointmentTime.to}`
-              : "N/A",
+            slot: item.slot || "N/A",
             isCanceled: item.isApmtCanceled,
             isPrescriptionCreated: item.isPrescriptionCreated,
-            isChecked: item.isPrescriptionCreated
+            isChecked: item.isPrescriptionCreated,
           }}
           onRetake={() => handleRetakeAppointment(item)}
           onToken={() => handleViewToken(item._id)}
           onCancel={() => handleCancelAppointment(item._id)}
-          onGeneratePDF={onGeneratePDF}
-        />
-        <InstructionModal
-          visible={instructionsVisible}
-          onClose={() => setInstructionsVisible(false)}
-          navigateToAppointment={handleNavigateToAppointment}
-          navigateToPatients={handleNavigateToPatients}
+          onGeneratePDF={() => onGeneratePDF(item)}
+          onViewPrescription={() => handleViewPrescription(item._id)}
+          showPrescription={item.isPrescriptionCreated}
         />
       </Animated.View>
     );
@@ -677,18 +939,11 @@ const DashboardScreen = () => {
   return (
     <View style={styles.container}>
       <Animated.View
-        style={[
-          styles.header,
-          { opacity: fadeAnim, transform: [{ translateY: translateY }] }
-        ]}
+        style={[styles.header, { opacity: fadeAnim, transform: [{ translateY: translateY }] }]}
       >
         <View style={styles.greetingContainer}>
           <Text style={styles.greeting}>Hello,</Text>
-          <Text
-            style={styles.userName}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-          >
+          <Text style={styles.userName} numberOfLines={1} ellipsizeMode="tail">
             {user?.fullName || "User"}
           </Text>
         </View>
@@ -710,10 +965,7 @@ const DashboardScreen = () => {
       </Animated.View>
 
       <Animated.View
-        style={[
-          styles.searchContainer,
-          { opacity: fadeAnim, transform: [{ translateY: translateY }] }
-        ]}
+        style={[styles.searchContainer, { opacity: fadeAnim, transform: [{ translateY: translateY }] }]}
       >
         <Ionicons name="search" size={18} color={COLORS.textSecondary} style={styles.searchIcon} />
         <TextInput
@@ -764,10 +1016,7 @@ const DashboardScreen = () => {
           contentContainerStyle={styles.listContainer}
           ListEmptyComponent={
             <Animated.View
-              style={[
-                styles.emptyContainer,
-                { opacity: fadeAnim, transform: [{ translateY: translateY }] }
-              ]}
+              style={[styles.emptyContainer, { opacity: fadeAnim, transform: [{ translateY: translateY }] }]}
             >
               <Ionicons name="calendar-outline" size={48} color={COLORS.lightGray} />
               <Text style={styles.emptyText}>No appointments found</Text>
@@ -793,6 +1042,12 @@ const DashboardScreen = () => {
           }
         />
       )}
+      <InstructionModal
+        visible={instructionsVisible}
+        onClose={() => setInstructionsVisible(false)}
+        navigateToAppointment={handleNavigateToAppointment}
+        navigateToPatients={handleNavigateToPatients}
+      />
     </View>
   );
 };
@@ -801,7 +1056,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    backgroundColor: COLORS.background
+    backgroundColor: COLORS.background,
   },
   header: {
     flexDirection: "row",
@@ -831,7 +1086,7 @@ const styles = StyleSheet.create({
   appointmentText: {
     fontSize: 14,
     color: "#fff",
-    fontWeight: "bold"
+    fontWeight: "bold",
   },
   searchContainer: {
     flexDirection: "row",
@@ -886,95 +1141,6 @@ const styles = StyleSheet.create({
   listContainer: {
     paddingBottom: 20,
   },
-  card: {
-    backgroundColor: COLORS.cardBackground,
-    borderRadius: 12,
-    marginBottom: 12,
-    overflow: "hidden",
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.primary,
-  },
-  cardContent: {
-    padding: 12,
-  },
-  cardMainInfo: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 10,
-  },
-  patientInfoContainer: {
-    flexDirection: "column",
-    flex: 1,
-    marginRight: 8,
-  },
-  patientName: {
-    fontSize: 15,
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
-  },
-  mrnText: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  cardDetailsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginBottom: 10,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGray,
-  },
-  detailItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    width: "50%",
-    marginBottom: 6,
-  },
-  detailText: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    marginLeft: 6,
-  },
-  status: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    fontWeight: "bold",
-    fontSize: 10,
-    alignSelf: "flex-start",
-    overflow: "hidden",
-  },
-  status_completed: { backgroundColor: COLORS.success, color: "white" },
-  status_pending: { backgroundColor: COLORS.warning, color: "#333" },
-  status_cancelled: { backgroundColor: COLORS.danger, color: "white" },
-  cardActions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    marginTop: 4,
-  },
-  actionButton: {
-    backgroundColor: COLORS.accent,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 6,
-    marginLeft: 8,
-  },
-  tokenButton: {
-    backgroundColor: COLORS.tokenPurple,
-  },
-  retakeButton: {
-    backgroundColor: COLORS.primary,
-  },
-  buttonText: {
-    color: "white",
-    fontWeight: "bold",
-    marginLeft: 4,
-    fontSize: 12,
-  },
   emptyContainer: {
     alignItems: "center",
     justifyContent: "center",
@@ -1026,7 +1192,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 14,
   },
-  status_expired: { backgroundColor: COLORS.lightGray, color: COLORS.textSecondary },
   headerButtons: {
     flexDirection: "row",
     alignItems: "center",

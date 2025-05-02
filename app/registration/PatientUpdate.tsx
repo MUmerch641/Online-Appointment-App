@@ -272,7 +272,7 @@ const PatientUpdateScreen = () => {
               <MaterialIcons name="wc" size={16} color={COLORS.primary} /> Gender
             </Text>
             <View style={styles.genderContainer}>
-              {["Male", "Female", "Child"].map((option) => (
+              {["Male", "Female"].map((option) => (
                 <TouchableOpacity 
                   key={option} 
                   onPress={() => setGender(option)} 
