@@ -18,5 +18,5 @@
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
     "config/tailwind.config.js"
-, "components/generatePDF.jsx"  ]
+, "components/generatePDF.jsx", "components/prescription.js"  ]
 }

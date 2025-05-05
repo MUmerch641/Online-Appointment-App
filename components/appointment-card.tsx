@@ -3,26 +3,28 @@ import { Card } from "react-native-paper"
 import { Ionicons } from "@expo/vector-icons"
 import { COLORS } from "@/constants/Colors"
 
-interface AppointmentCardProps {
+export interface AppointmentCardProps {
   appointment: {
-    _id: string
+    _id: string;
     patientId: {
-      patientName: string
-      mrn: string | number
-    }
+      patientName: string;
+      mrn: string;
+    };
     doctor: {
-      fullName: string
-    }
-    appointmentDate: string
-    slot: string
-    isCanceled?: boolean
-    isChecked?: boolean
-    isPrescriptionCreated?: boolean
-  }
-  onRetake: (appointment: any) => void
-  onToken: (id: string) => void
-  onCancel: (id: string) => void
-  onGeneratePDF: (appointment: any) => void
+      fullName: string;
+    };
+    appointmentDate: string;
+    slot: string;
+    isCanceled: boolean;
+    isPrescriptionCreated: boolean;
+    isChecked: boolean;
+  };
+  onRetake: (appointment: AppointmentCardProps["appointment"]) => void;
+  onToken: (appointmentId: string) => void;
+  onCancel: () => void;
+  onGeneratePDF: (appointment: AppointmentCardProps["appointment"]) => void;
+  onViewPrescription: () => void; // Added this property
+  showPrescription: boolean;
 }
 
 const formatDate = (dateString: string) => {
@@ -51,8 +53,22 @@ const AppointmentCard = ({
   return (
     <Card style={styles.card}>
       <View style={styles.headerContainer}>
-        <TouchableOpacity onPress={() => onGeneratePDF(appointment)} style={styles.pdfButton}>
-          <Ionicons name="document-outline" size={16} color="#333" />
+
+
+        <TouchableOpacity style={[
+          styles.pdfButton,
+          {
+            borderColor: appointment.isPrescriptionCreated ? "green" : "orange",
+          },
+        ]}
+          onPress={() => onGeneratePDF(appointment)}
+        >
+          <Ionicons name="print" size={16} color={appointment.isPrescriptionCreated ? "green" : "orange"} />
+          <Text style={[
+          {
+           color: appointment.isPrescriptionCreated ? "green" : "orange",
+          },
+        ]}>View Prescription</Text>
         </TouchableOpacity>
 
         <View style={styles.patientInfoContainer}>
@@ -122,11 +138,15 @@ const styles = StyleSheet.create({
   pdfButton: {
     position: "absolute",
     right: 8,
-    top: 8,
+    top: 10,
     padding: 6,
     borderRadius: 4,
-    backgroundColor: "#f2f2f2",
+    backgroundColor: "transparent",
     zIndex: 2,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   patientInfoContainer: {
     flex: 1,

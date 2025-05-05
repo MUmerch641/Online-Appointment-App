@@ -12,8 +12,10 @@ import {
   Easing,
   ListRenderItemInfo,
   Platform,
-  Image,
+  Modal,
+
 } from "react-native";
+import { WebView } from "react-native-webview";
 import { useRouter } from "expo-router";
 import { useSelector } from "react-redux";
 import { Ionicons } from "@expo/vector-icons";
@@ -28,171 +30,20 @@ import InstructionModal from "../../components/InstructionModal";
 import AppointmentCard from "../../components/appointment-card";
 import * as Print from "expo-print";
 import * as FileSystem from "expo-file-system";
-import * as MediaLibrary from "expo-media-library";
 import * as Sharing from "expo-sharing";
 import axios from "axios";
 import { API_BASE_URL } from "@/config/apiConfig";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// Helper function to format date
-const formatDate = (dateString: string): string => {
-  if (!dateString) return "N/A";
-  try {
-    const date = new Date(dateString);
-    return date
-      .toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      })
-      .replace(/\//g, "/");
-  } catch (e) {
-    return dateString;
-  }
-};
-
-// Helper function to wrap long strings
-const wrapString = (input: string, maxLength: number): string => {
-  if (!input) return "";
-  if (input.length > maxLength) {
-    return `${input.slice(0, maxLength)}...`;
-  }
-  return input;
-};
-
-// Helper function to capitalize names
-const capitalizeName = (name: string): string => {
-  if (!name) return "";
-  return name
-    .split(" ")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-};
-
-// Generate fallback QR code using Google Charts API
-const generateQRCode = (url: string): string => {
-  return `https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(url)}`;
-};
-
-// Helper function to get default QR data
-const getDefaultQrData = (appointment: any, userData?: any) => {
-  return {
-    mrn: appointment?.patientId?.mrn || "N/A",
-    patientName: appointment?.patientId?.patientName || "Unknown",
-    phonNumber: appointment?.patientId?.phonNumber || "N/A",
-    visitId: appointment?._id || "N/A",
-    tokenId: appointment?._id?.slice(0, 8) || "N/A",
-
-    visitNo: "N/A",
-    appointmentDate: formatDate(appointment?.appointmentDate) || "N/A",
-    appointmentTime: { from: appointment?.slot?.split(" - ")[0] || "N/A" },
-    doctorName: appointment?.doctor?.fullName || "N/A",
-    feeStatus: appointment?.feeStatus || "pending",
-    bookedServices: Array.isArray(appointment?.bookedServices) ? appointment.bookedServices : [],
-    discount: appointment?.discount || 0,
-    hospitalName: userData?.hospital?.hospitalName || "Your Hospital Name",
-    hospitalPhone: userData?.hospital?.phoneNo || "N/A",
-  };
-};
-
-const fetchQrData = async (id: string, userData: User | null) => {
-  try {
-    const token = userData?.token;
-    if (!token) {
-      Alert.alert("Error", "Authentication token not found");
-      return null;
-    }
-
-    const response = await axios.post(
-      `${API_BASE_URL}/online-appointment/generateToken/${id}`,
-      {},
-      {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-
-    console.log("Token generation response:", response.data);
-    
-    if (response.data.isSuccess) {
-      return response.data.data;
-    } else {
-      throw new Error(response.data.message || "Failed to generate token");
-    }
-  } catch (error) {
-    console.error("Error generating token:", error);
-    Alert.alert("Error", "Failed to generate token");
-    return null;
-  }
-};
-
-// Helper function to fetch prescription data
-const fetchPrescriptionData = async (appointmentId: string, userData: User | null) => {
-  try {
-    const token = userData?.token;
-    if (!token) {
-      Alert.alert("Error", "Authentication token not found");
-      return null;
-    }
-
-    const response = await axios.get(
-      `${API_BASE_URL}/online-appointment/getPrescripByAppointmentId/${appointmentId}`,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-
-    console.log("Prescription data response:", response.data);
-    
-    if (response.data.isSuccess) {
-      return response.data.data;
-    } else {
-      throw new Error(response.data.message || "Failed to fetch prescription");
-    }
-  } catch (error) {
-    console.error("Error fetching prescription:", error);
-    Alert.alert("Error", "Failed to fetch prescription data");
-    return null;
-  }
-};
-
-// Helper function to calculate total fee from services
-const calculateTotalFee = (services: any[] | undefined): number => {
-  if (!Array.isArray(services)) return 0;
-  return services.reduce((total, service) => total + (service?.fee || 0), 0);
-};
-
-// Helper function to calculate age from date of birth
-const calculateAge = (dob: string): string => {
-  if (!dob) return "N/A";
-  
-  try {
-    const birthDate = new Date(dob);
-    const today = new Date();
-    
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    
-    return age.toString();
-  } catch (e) {
-    return "N/A";
-  }
-};
-
-// Dashboard Screen Component
+// Interfaces
 interface Patient {
   _id: string;
   patientName: string;
   mrn: string;
+  phonNumber?: string;
+  dob?: string;
+  guardiansName?: string;
+  gender?: string;
+  healthId?: string;
 }
 
 interface Doctor {
@@ -230,15 +81,674 @@ interface ItemAnimation {
 interface User {
   fullName: string;
   token?: string;
-  hospital?: { hospitalName: string; phoneNo: string; address?: string; logoUrl?: string };
+  hospital?: {
+    hospitalName: string;
+    phoneNo: string;
+    address?: string;
+    logoUrl?: string;
+  };
 }
 
+interface PrescriptionData {
+  patientData?: Patient[];
+  headerUrl?: string;
+  footerUrl?: string;
+  symptoms?: string[];
+  signs?: string[];
+  diagnosis?: string[];
+  tests?: { testName: string; procedureName: string }[];
+  medicines?: {
+    name: string;
+    dosage: string;
+    duration: string;
+    frequency?: {
+      desiredNotation?: string;
+      eng_notation?: string;
+      urdu_notation?: string;
+    };
+    desiredRoute?: string;
+    RA_Urdu_Term?: string;
+    RA_Medical_Term?: string;
+    instructions?: string;
+    note?: string;
+    durationDirection?: string;
+  }[];
+  procedure?: string;
+  procedureDetails?: string;
+  setOfInstruction?: { instructions: string }[];
+  signature?: string;
+  stamp?: string;
+  appointmentDate?: string;
+  visit_no?: number;
+  comment?: string;
+  vitals?: {
+    bloodPressure?: string;
+    pulse?: string;
+  };
+  guidance?: string;
+  durationDirection?: string;
+}
+
+// Helper function to format date
+const formatDate = (dateString?: string): string => {
+  if (!dateString) return "N/A";
+  try {
+    const date = new Date(dateString);
+    return date
+      .toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
+      .replace(/\//g, "/");
+  } catch {
+    return dateString;
+  }
+};
+
+// Helper function to calculate age from date of birth
+const calculateAge = (dob?: string): string => {
+  if (!dob) return "N/A";
+  try {
+    const birthDate = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (
+      monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birthDate.getDate())
+    ) {
+      age--;
+    }
+    return age.toString();
+  } catch {
+    return "N/A";
+  }
+};
+
+// Helper function to fetch prescription data
+const fetchPrescriptionData = async (
+  appointmentId: string,
+  userData: User | null
+): Promise<PrescriptionData | null> => {
+  try {
+    const token = userData?.token;
+    if (!token) {
+      Alert.alert("Error", "Authentication token not found");
+      return null;
+    }
+
+    const response = await axios.get(
+      `${API_BASE_URL}/online-appointment/getPrescripByAppointmentId/${appointmentId}`,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+
+    if (response.data.isSuccess) {
+      return response.data.data;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error fetching prescription:", error);
+    return null;
+  }
+};
+
+// Helper function to fetch QR/token data
+const fetchQrData = async (id: string, userData: User | null) => {
+  try {
+    const token = userData?.token;
+    if (!token) {
+      Alert.alert("Error", "Authentication token not found");
+      return null;
+    }
+
+    const response = await axios.post(
+      `${API_BASE_URL}/online-appointment/generateToken/${id}`,
+      {},
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (response.data.isSuccess) {
+      return response.data.data;
+    }
+    throw new Error(response.data.message || "Failed to generate token");
+  } catch (error) {
+    console.error("Error generating token:", error);
+    Alert.alert("Error", "Failed to generate token");
+    return null;
+  }
+};
+
+// Helper function to generate token PDF
+const generateTokenPDF = async (tokenData: any): Promise<string> => {
+  const htmlContent = `
+      <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .container { max-width: 800px; margin: 0 auto; }
+            h1 { color: #007bff; }
+            .info { margin: 10px 0; }
+            .info label { font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>Appointment Token</h1>
+            <div class="info"><label>Patient Name:</label> ${tokenData.patientName ?? 'N/A'}</div>
+            <div class="info"><label>MRN:</label> ${tokenData.mrn ?? 'N/A'}</div>
+            <div class="info"><label>Token ID:</label> ${tokenData.tokenId ?? 'N/A'}</div>
+            <div class="info"><label>Date:</label> ${tokenData.appointmentDate ?? 'N/A'}</div>
+            <div class="info"><label>Time:</label> ${tokenData.appointmentTime?.from ?? 'N/A'}</div>
+            <div class="info"><label>Doctor:</label> ${tokenData.doctorName ?? 'N/A'}</div>
+            <div class="info"><label>Hospital:</label> ${tokenData.hospitalName ?? 'N/A'}</div>
+          </div>
+        </body>
+      </html>
+    `;
+  return htmlContent;
+};
+
+// Helper function to generate prescription PDF
+const generatePrescriptionPDF = async (
+  prescriptionData: PrescriptionData,
+  user: User | null
+): Promise<string> => {
+  const patient: Patient = prescriptionData.patientData?.[0] ?? {
+    _id: "",
+    patientName: "N/A",
+    mrn: "N/A",
+  };
+
+  // Function to detect if text is primarily Urdu
+  const detectLanguage = (text?: string): { direction: string, textAlign: string, fontFamily: string } => {
+    if (!text) return { direction: 'ltr', textAlign: 'left', fontFamily: 'Arial, sans-serif' };
+
+    const urduRangeStart = 0x0600;
+    const urduRangeEnd = 0x06FF;
+    let urduCount = 0;
+    let totalChars = 0;
+
+    // Strip HTML tags for more accurate detection
+    const plainText = text.replace(/<[^>]+>/g, '').trim();
+
+    for (let char of plainText) {
+      const code = char.charCodeAt(0);
+      if (code >= urduRangeStart && code <= urduRangeEnd) {
+        urduCount++;
+      }
+      totalChars++;
+    }
+
+    const urduPercentage = totalChars > 0 ? (urduCount / totalChars) * 100 : 0;
+    return urduPercentage > 50
+      ? { direction: 'rtl', textAlign: 'right', fontFamily: "'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Arial, sans-serif" }
+      : { direction: 'ltr', textAlign: 'left', fontFamily: 'Arial, sans-serif' };
+  };
+
+  // Detect language for instructions if they exist
+  const instructionsStyle = prescriptionData.setOfInstruction?.length && prescriptionData.setOfInstruction[0]?.instructions
+    ? detectLanguage(prescriptionData.setOfInstruction[0].instructions)
+    : { direction: 'ltr', textAlign: 'left', fontFamily: 'Arial, sans-serif' };
+
+  const htmlContent = ` <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prescription</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 0;
+    }
+    @font-face {
+      font-family: 'Jameel Noori Nastaleeq';
+      src: url('https://example.com/fonts/JameelNooriNastaleeq.ttf') format('truetype'); /* Replace with actual font URL or local path */
+      fallback: 'Noto Nastaliq Urdu', Arial, sans-serif;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      font-size: 12px;
+      width: 210mm;
+      background-color: #ffffff;
+    }
+    
+    .page {
+      width: 210mm;
+      height: 297mm;
+      border: 1px solid #000;
+      position: relative;
+      box-sizing: border-box;
+      page-break-after: always;
+    }
+    
+    .header-container {
+      width: 100%;
+      position: fixed;
+      top: 0;
+      height: 80px;
+      background: #fff;
+      z-index: 1000;
+      border-bottom: 1px solid #000;
+    }
+    
+    .header-image {
+      width: 100%;
+      height: auto;
+      max-height: 80px;
+      object-fit: contain;
+    }
+    
+    .main-content {
+      margin-top: 90px;
+      margin-bottom: 60px;
+      min-height: calc(297mm - 150px);
+      display: flex;
+    }
+    
+    .left-column {
+      width: 30%;
+      border-right: 1px solid #000;
+      padding: 5px;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .right-column {
+      width: 70%;
+      padding: 5px;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .info-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    
+    .info-item {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 3px;
+    }
+    
+    .info-label {
+      font-weight: bold;
+      width: 80px;
+      color: #0000ff;
+    }
+    
+    .info-value {
+      flex: 1;
+    }
+    
+    .section {
+      margin-bottom: 8px;
+    }
+    
+    .section-title {
+      color: #0000ff;
+      font-weight: bold;
+      margin: 8px 0 4px 0;
+      text-decoration: underline;
+    }
+    
+    .section-content {
+      margin-bottom: 0;
+    }
+    
+    .medication-container {
+      flex: 1;
+    }
+    
+    .medication-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 5px;
+    }
+    
+    .medication-table th, .medication-table td {
+      border: 1px solid #ccc;
+      padding: 5px;
+      text-align: left;
+      vertical-align: top;
+      font-size: 12px;
+      word-wrap: break-word;
+    }
+    
+    .medication-table th {
+      background-color: #f0f0f0;
+      font-weight: bold;
+      color: #0000ff;
+    }
+    
+    .medication-table td {
+      background-color: #fff;
+    }
+    
+    .medication-name {
+      font-weight: bold;
+    }
+    
+    .footer-container {
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      text-align: center;
+      padding: 5px;
+      font-size: 10px;
+      border-top: 1px solid #000;
+      height: 50px;
+      background: #fff;
+      z-index: 1000;
+    }
+    
+    .footer-image {
+      width: 100%;
+      height: auto;
+      max-height: 50px;
+      object-fit: contain;
+    }
+    
+    .diagnosis-item,
+    .history-item,
+    .examination-item,
+    .test-item {
+      margin-bottom: 3px;
+      page-break-inside: avoid;
+    }
+    
+    .note {
+      font-style: italic;
+      font-size: 10px;
+      color: #555;
+      margin-top: 2px;
+    }
+    
+    .empty-section {
+      color: #999;
+      font-style: italic;
+    }
+    
+    .indications-section {
+      margin-top: 10px;
+      page-break-inside: avoid;
+    }
+    
+    .guidelines-section {
+      margin-bottom: 10px;
+      page-break-inside: avoid;
+      background-color: #f9f9f9;
+      padding: 5px;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <!-- Header Section -->
+    ${prescriptionData.headerUrl ? `<div class="header-container"><img src="${prescriptionData.headerUrl}" class="header-image" alt="Header"></div>` : ''}
+    
+    <!-- Main Content -->
+    <div class="main-content">
+      <!-- Left Column - Patient and Clinical Data -->
+      <div class="left-column">
+        <div class="info-grid">
+          <div class="info-item"><span class="info-label">MRN:</span><span class="info-value">${patient.mrn || ''}</span></div>
+          <div class="info-item"><span class="info-label">Visit No:</span><span class="info-value">${prescriptionData.visit_no || ''}</span></div>
+          <div class="info-item"><span class="info-label">Name:</span><span class="info-value">${patient.patientName || ''}</span></div>
+          <div class="info-item"><span class="info-label">Age/Gender:</span><span class="info-value">${calculateAge(patient.dob) || ''} / ${patient.gender || ''}</span></div>
+          <div class="info-item"><span class="info-label">Date:</span><span class="info-value">${formatDate(prescriptionData.appointmentDate) || formatDate(new Date().toISOString())}</span></div>
+          <div class="info-item"><span class="info-label">Contact:</span><span class="info-value">${patient.phonNumber || ''}</span></div>
+          ${patient.healthId ? `<div class="info-item"><span class="info-label">Health ID:</span><span class="info-value">${patient.healthId}</span></div>` : ''}
+          ${patient.guardiansName ? `<div class="info-item"><span class="info-label">Guardian:</span><span class="info-value">${patient.guardiansName}</span></div>` : ''}
+          ${prescriptionData.vitals?.bloodPressure ? `<div class="info-item"><span class="info-label">BP:</span><span class="info-value">${prescriptionData.vitals.bloodPressure}</span></div>` : ''}
+          ${prescriptionData.vitals?.pulse ? `<div class="info-item"><span class="info-label">Pulse:</span><span class="info-value">${prescriptionData.vitals.pulse}</span></div>` : ''}
+        </div>
+        
+        ${prescriptionData.diagnosis?.length ? `<div class="section"><div class="section-title">Diagnosis:</div><div class="section-content">${prescriptionData.diagnosis.map(diag => `<div class="diagnosis-item">${diag}</div>`).join('')}</div></div>` : ''}
+        
+        ${prescriptionData.symptoms?.length ? `<div class="section"><div class="section-title">History:</div><div class="section-content">${prescriptionData.symptoms.map(symptom => `<div class="history-item">${symptom}</div>`).join('')}</div></div>` : ''}
+        
+        ${prescriptionData.signs?.length ? `<div class="section"><div class="section-title">Examination:</div><div class="section-content">${prescriptionData.signs.map(sign => `<div class="examination-item">${sign}</div>`).join('')}</div></div>` : ''}
+        
+        ${prescriptionData.procedure ? `<div class="section"><div class="section-title">Procedure:</div><div class="section-content"><div>${prescriptionData.procedure}${prescriptionData.procedureDetails ? `: ${prescriptionData.procedureDetails}` : ''}</div></div></div>` : ''}
+        
+        ${prescriptionData.tests?.length ? `<div class="section"><div class="section-title">Investigation:</div><div class="section-content">${prescriptionData.tests.map(test => `<div class="test-item">${test.testName || ''}</div>`).join('')}</div></div>` : ''}
+      </div>
+      
+      <!-- Right Column - Guidelines, Medicine, and Indications -->
+      <div class="right-column">
+        ${prescriptionData.guidance ? `<div class="guidelines-section"><div class="section-title">Guidelines:</div><div class="section-content" style="direction: ${prescriptionData.durationDirection || 'ltr'}; text-align: ${prescriptionData.durationDirection === 'rtl' ? 'right' : 'left'}; ${prescriptionData.durationDirection === 'rtl' ? "font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Arial, sans-serif;" : ''}"><div>${prescriptionData.guidance}</div></div></div>` : ''}
+        
+        <div class="medication-container">
+          <div class="section-title">Medicine:</div>
+          <div class="section-content">
+            ${prescriptionData.medicines?.length ? `<table class="medication-table"><thead><tr><th style="width: 35%;">Medicine</th><th style="width: 25%;">Dosage</th><th style="width: 20%;">Route</th><th style="width: 20%;">Duration</th></tr></thead><tbody>${prescriptionData.medicines.map((med, index) => `<tr><td><span class="medication-number" style="color: #ff0000;">${index + 1}.</span><span class="medication-name">${med.name || ''}</span>${med.note ? `<div class="note" style="direction: ${med.durationDirection || 'ltr'}; text-align: ${med.durationDirection === 'rtl' ? 'right' : 'left'}; ${med.durationDirection === 'rtl' ? "font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Arial, sans-serif;" : ''}">${med.durationDirection === 'rtl' ? 'نوٹ:' : 'Note:'} ${med.note}</div>` : ''}</td><td style="direction: ${med.durationDirection || 'ltr'}; text-align: ${med.durationDirection === 'rtl' ? 'right' : 'left'}; ${med.durationDirection === 'rtl' ? "font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Arial, sans-serif;" : ''}"><div>${med.frequency?.urdu_notation || med.frequency?.eng_notation || ''}</div></td><td style="direction: ${med.durationDirection || 'ltr'}; text-align: ${med.durationDirection === 'rtl' ? 'right' : 'left'}; ${med.durationDirection === 'rtl' ? "font-family: 'Jameel Noori Nastaleeq', 'Noto Nastaliq Urdu', Arial, sans-serif;" : ''}"><div>${med.RA_Urdu_Term || 'N/A'}</div></td><td><div>${med.duration || 'N/A'}</div></td></tr>`).join('')}</tbody></table>` : '<div class="empty-section">No medications prescribed</div>'}
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">Comments:</div>
+          <div class="section-content">${prescriptionData.comment ? prescriptionData.comment.trim() : ''}</div>
+        </div>
+        
+        ${prescriptionData.setOfInstruction?.length && prescriptionData.setOfInstruction[0]?.instructions ? `<div class="indications-section"><div class="section-title">Instructions:</div><div class="section-content" style="direction: ${instructionsStyle.direction}; text-align: ${instructionsStyle.textAlign}; font-family: ${instructionsStyle.fontFamily};"><div>${prescriptionData.setOfInstruction[0].instructions}</div></div></div>` : ''}
+      </div>
+    </div>
+    
+    <!-- Footer Section -->
+    ${prescriptionData.footerUrl ? `<div class="footer-container"><img src="${prescriptionData.footerUrl}" class="footer-image" alt="Footer"></div>` : ''}
+  </div>
+</body>
+</html>`;
+
+  return htmlContent;
+};
+
+// Helper function to show PDF options
+const showPDFOptions = async (uri: string, fileName: string, onSuccessfulSave?: () => void) => {
+  Alert.alert(
+    "PDF Generated",
+    "What would you like to do with the PDF?",
+    [
+      {
+        text: "Cancel",
+        style: "cancel",
+        onPress: async () => {
+          try {
+            await FileSystem.deleteAsync(uri, { idempotent: true });
+          } catch (error) {
+            console.warn("Failed to delete temporary file:", error);
+          }
+        },
+      },
+      {
+        text: "Share",
+        onPress: async () => {
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(uri, {
+              mimeType: "application/pdf",
+              dialogTitle: "Share PDF",
+            });
+          } else {
+            Alert.alert("Error", "Sharing not available on this device.");
+          }
+          try {
+            await FileSystem.deleteAsync(uri, { idempotent: true });
+          } catch (error) {
+            console.warn("Failed to delete temporary file:", error);
+          }
+        },
+      },
+      {
+        text: "Save",
+        onPress: async () => {
+          let fileUri = "";
+          if (Platform.OS === "android") {
+            try {
+              const permissions =
+                await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+              if (permissions.granted) {
+                const base64 = await FileSystem.readAsStringAsync(uri, {
+                  encoding: FileSystem.EncodingType.Base64,
+                });
+                fileUri =
+                  await FileSystem.StorageAccessFramework.createFileAsync(
+                    permissions.directoryUri,
+                    fileName,
+                    "application/pdf"
+                  );
+                await FileSystem.writeAsStringAsync(fileUri, base64, {
+                  encoding: FileSystem.EncodingType.Base64,
+                });
+                Alert.alert(
+                  "Success",
+                  `PDF saved to selected location: ${fileName}`,
+                  [
+                    {
+                      text: "OK",
+                      onPress: () => {
+                        if (onSuccessfulSave) onSuccessfulSave();
+                      }
+                    }
+                  ]
+                );
+              } else {
+                Alert.alert("Error", "Storage access permission denied.");
+                fileUri = `${FileSystem.documentDirectory}${fileName}`;
+                await FileSystem.moveAsync({ from: uri, to: fileUri });
+                Alert.alert(
+                  "Fallback",
+                  `Saved to app's document directory: ${fileUri}`
+                );
+              }
+            } catch (error) {
+              console.error("Save error:", error);
+              fileUri = `${FileSystem.documentDirectory}${fileName}`;
+              await FileSystem.moveAsync({ from: uri, to: fileUri });
+              Alert.alert(
+                "Fallback",
+                `Failed to save to selected location. Saved to: ${fileUri}`
+              );
+            }
+          } else {
+            fileUri = `${FileSystem.documentDirectory}${fileName}`;
+            await FileSystem.moveAsync({ from: uri, to: fileUri });
+            Alert.alert(
+              "Success",
+              `PDF saved to: ${fileUri}\nYou can share it to save to another location.`,
+              [
+                { text: "OK", style: "cancel" },
+                {
+                  text: "Share",
+                  onPress: async () => {
+                    if (await Sharing.isAvailableAsync()) {
+                      await Sharing.shareAsync(fileUri, {
+                        mimeType: "application/pdf",
+                        dialogTitle: "Share PDF",
+                      });
+                    } else {
+                      Alert.alert(
+                        "Error",
+                        "Sharing not available on this device."
+                      );
+                    }
+                  },
+                },
+              ]
+            );
+          }
+        },
+      },
+    ],
+    { cancelable: true }
+  );
+};
+
+// PDF Preview Modal Component
+const PreviewPDFModal: React.FC<{
+  visible: boolean;
+  htmlContent: string;
+  fileName: string;
+  onClose: () => void;
+}> = ({ visible, htmlContent, fileName, onClose }) => {
+  const handleSaveShare = async () => {
+    try {
+      const { uri } = await Print.printToFileAsync({
+        html: htmlContent,
+        width: 210 * 2.83465,
+        height: 297 * 2.83465,
+      });
+      await showPDFOptions(uri, fileName, onClose);
+    } catch (error) {
+      console.error("PDF generation error:", error);
+      Alert.alert("Error", "Failed to generate PDF");
+    }
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalContainer}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>PDF Preview</Text>
+          <TouchableOpacity onPress={onClose}>
+            <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+          </TouchableOpacity>
+        </View>
+        <WebView
+          originWhitelist={['*']}
+          source={{ html: htmlContent }}
+          style={styles.webView}
+          scalesPageToFit={true}
+        />
+        <View style={styles.modalButtons}>
+          <TouchableOpacity
+            style={[styles.modalButton, styles.saveButton]}
+            onPress={handleSaveShare}
+          >
+            <Text style={styles.buttonText}>Save/Share</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.modalButton, styles.cancelButton]}
+            onPress={onClose}
+          >
+            <Text style={styles.buttonText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+// Dashboard Screen Component
 const DashboardScreen = () => {
   const router = useRouter();
   const user = useSelector(selectUser) as User | null;
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [instructionsVisible, setInstructionsVisible] = useState<boolean>(false);
+  const [previewVisible, setPreviewVisible] = useState<boolean>(false);
+  const [previewHtml, setPreviewHtml] = useState<string>("");
+  const [previewFileName, setPreviewFileName] = useState<string>("");
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(20)).current;
@@ -246,20 +756,16 @@ const DashboardScreen = () => {
 
   const itemAnimations = useRef(new Map<string, ItemAnimation>()).current;
 
-  const { data: appointmentsData, refetch, isLoading } = useGetAllAppointmentsQuery(
-    { search: searchQuery || "" }
-  );
+  const { data: appointmentsData, refetch, isLoading } =
+    useGetAllAppointmentsQuery({ search: searchQuery || "" });
   const [cancelAppointment] = useCancelAppointmentMutation();
 
   useFocusEffect(
     useCallback(() => {
       fadeAnim.setValue(0);
       translateY.setValue(20);
-
       itemAnimations.clear();
-
-      refetchAppointments();
-
+      refetch();
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -273,7 +779,7 @@ const DashboardScreen = () => {
           useNativeDriver: true,
         }),
       ]).start();
-    }, [])
+    }, [fadeAnim, translateY, itemAnimations, refetch])
   );
 
   const handleNavigateToAppointment = () => {
@@ -287,13 +793,11 @@ const DashboardScreen = () => {
   const startItemAnimations = useCallback(() => {
     if (appointmentsData?.data) {
       const maxDelay = Math.min(appointmentsData.data.length * 50, 1000);
-
       appointmentsData.data.forEach((item: Appointment, index: number) => {
         const animations = itemAnimations.get(item._id);
         if (animations) {
           const delayFactor = appointmentsData.data.length > 10 ? 0.5 : 1;
           const delay = Math.min(index * 50 * delayFactor, maxDelay);
-
           Animated.parallel([
             Animated.timing(animations.fadeAnim, {
               toValue: 1,
@@ -324,10 +828,7 @@ const DashboardScreen = () => {
           });
         }
       });
-
-      setTimeout(() => {
-        startItemAnimations();
-      }, 100);
+      setTimeout(() => startItemAnimations(), 100);
     }
   }, [appointmentsData?.data, isLoading, startItemAnimations]);
 
@@ -336,7 +837,7 @@ const DashboardScreen = () => {
     outputRange: ["0deg", "360deg"],
   });
 
-  const animateRefresh = (): void => {
+  const animateRefresh = () => {
     spinValue.setValue(0);
     Animated.timing(spinValue, {
       toValue: 1,
@@ -346,23 +847,23 @@ const DashboardScreen = () => {
     }).start();
   };
 
-  const refetchAppointments = async (): Promise<void> => {
+  const refetchAppointments = async () => {
     setIsRefreshing(true);
     animateRefresh();
     try {
       await refetch();
     } catch (error) {
-      Alert.alert("Error refreshing appointments:");
+      Alert.alert("Error", "Failed to refresh appointments");
     } finally {
       setIsRefreshing(false);
     }
   };
 
-  const handleSearch = (): void => {
+  const handleSearch = () => {
     refetch();
   };
 
-  const handleCancelAppointment = async (appointmentId: string): Promise<void> => {
+  const handleCancelAppointment = async (appointmentId: string) => {
     Alert.alert(
       "Reason for Cancellation",
       "Please provide a reason",
@@ -370,16 +871,16 @@ const DashboardScreen = () => {
         { text: "Cancel", style: "cancel" },
         {
           text: "Submit",
-          onPress: async (reason = "Appointment no longer needed") => {
+          onPress: async () => {
             try {
               await cancelAppointment({
                 id: appointmentId,
-                cancel_reason: reason,
+                cancel_reason: "Appointment no longer needed",
               }).unwrap();
-              Alert.alert("Success", "Appointment cancelled successfully.");
+              Alert.alert("Success", "Appointment cancelled successfully");
               refetchAppointments();
-            } catch (error) {
-              Alert.alert("Error", "Failed to cancel appointment.");
+            } catch {
+              Alert.alert("Error", "Failed to cancel appointment");
             }
           },
         },
@@ -388,7 +889,7 @@ const DashboardScreen = () => {
     );
   };
 
-  const handleRetakeAppointment = (appointment: Appointment): void => {
+  const handleRetakeAppointment = (appointment: Appointment) => {
     router.push({
       pathname: "/appointments/CreateAppointmentScreen",
       params: {
@@ -403,12 +904,11 @@ const DashboardScreen = () => {
     });
   };
 
-  const handleViewToken = (appointmentId: string): void => {
+  const handleViewToken = (appointmentId: string) => {
     if (!appointmentId) {
       Alert.alert("Error", "Invalid appointment ID");
       return;
     }
-
     router.push({
       pathname: "/appointments/AppointmentReciept",
       params: { appointmentId },
@@ -417,24 +917,15 @@ const DashboardScreen = () => {
 
   const handleViewPrescription = async (appointmentId: string) => {
     try {
-      // Fetch prescription data
       const prescriptionData = await fetchPrescriptionData(appointmentId, user);
-      
       if (!prescriptionData) {
         Alert.alert("Info", "No prescription found for this appointment");
         return;
       }
-      
-      // Find the appointment data
-      const appointment = appointmentsData?.data?.find(item => item._id === appointmentId);
-      
-      if (!appointment) {
-        Alert.alert("Error", "Appointment data not found");
-        return;
-      }
-      
-      // Generate PDF with the prescription data
-      await generatePrescriptionPDF(prescriptionData, appointment);
+      const htmlContent = await generatePrescriptionPDF(prescriptionData, user);
+      setPreviewHtml(htmlContent);
+      setPreviewFileName(`Prescription_${prescriptionData.patientData?.[0]?.mrn ?? "unknown"}`);
+      setPreviewVisible(true);
     } catch (error) {
       console.error("Error viewing prescription:", error);
       Alert.alert("Error", "Failed to load prescription");
@@ -445,482 +936,90 @@ const DashboardScreen = () => {
     if (!appointment.appointmentDate || !appointment.appointmentTime?.from) {
       return false;
     }
-
     const today = new Date();
     const appointmentDate = new Date(appointment.appointmentDate);
-
     if (appointmentDate.getTime() < today.setHours(0, 0, 0, 0)) {
       return true;
     }
-
     today.setHours(0, 0, 0, 0);
-
     if (appointmentDate.getTime() === today.getTime()) {
       const timeStr = appointment.appointmentTime.from;
       const timeRegex = /(\d+):(\d+)(?:\s*(AM|PM))?/i;
       const match = timeStr.match(timeRegex);
-
       if (match) {
         let hours = parseInt(match[1]);
         const minutes = parseInt(match[2]);
         const period = match[3]?.toUpperCase();
-
         if (period === "PM" && hours < 12) hours += 12;
         if (period === "AM" && hours === 12) hours = 0;
-
         const appointmentTime = new Date();
         appointmentTime.setHours(hours, minutes, 0, 0);
-
         return new Date() > appointmentTime;
       }
     }
-
     return false;
   };
 
-  const onRefresh = (): void => {
+  const onRefresh = () => {
     refetchAppointments();
   };
 
-  const onGeneratePDF = async (appointment: any) => {
+  const onGeneratePDF = async (appointment: Appointment) => {
     try {
-      // Get appointment ID
       const appointmentId = appointment._id;
       if (!appointmentId) {
         Alert.alert("Error", "Invalid appointment ID");
         return;
       }
-      
-      // First check if prescription is available for this appointment
-      const prescriptionData = appointment.isPrescriptionCreated ? 
-        await fetchPrescriptionData(appointmentId, user) : null;
-      
-      // If prescription data is available, use it for PDF generation, otherwise fetch token data
+      const prescriptionData = await fetchPrescriptionData(appointmentId, user);
       if (prescriptionData) {
-        await generatePrescriptionPDF(prescriptionData, appointment);
+        const htmlContent = await generatePrescriptionPDF(prescriptionData, user);
+        setPreviewHtml(htmlContent);
+        setPreviewFileName(`Prescription_${prescriptionData.patientData?.[0]?.mrn ?? "unknown"}`);
+        setPreviewVisible(true);
       } else {
-        // Fetch token data and generate regular token PDF
         const tokenData = await fetchQrData(appointmentId, user);
-        
-        if (!tokenData) {
-          return; // Error already handled in fetchQrData
+        if (tokenData) {
+          const htmlContent = await generateTokenPDF(tokenData);
+          setPreviewHtml(htmlContent);
+          setPreviewFileName(`Token_${tokenData.mrn ?? "unknown"}`);
+          setPreviewVisible(true);
         }
-        
-        await generateTokenPDF(tokenData);
       }
     } catch (error) {
       console.error("PDF Generation Error:", error);
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
-      Alert.alert("Error", `Failed to generate PDF: ${errorMessage}`);
+      Alert.alert("Error", "Failed to generate PDF");
     }
   };
 
-  const generatePrescriptionPDF = async (prescriptionData: any, appointment: any) => {
-    try {
-      // Generate QR code URL using Google Charts API
-      const qrCodeUrl = `https://pakhims.com/?MRN=${encodeURIComponent(prescriptionData.patientData?.[0]?.mrn || "")}&visitId=${encodeURIComponent(appointment._id)}`;
-      const qrCodeDataUrl = generateQRCode(qrCodeUrl);
-      
-      // Get patient data
-      const patient = prescriptionData.patientData?.[0] || {};
-      
-      // Get header and footer URLs
-      const headerUrl = prescriptionData.headerUrl || "";
-      const footerUrl = prescriptionData.footerUrl || "";
-      const signature = prescriptionData.signature || "";
-      const stamp = prescriptionData.stamp || "";
-      
-      // Set visit number
-      const visitNo = prescriptionData.visit_no || 1;
-      
-      // Generate HTML content for PDF with header and footer images
-      const htmlContent = `
-        <html>
-          <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-              body { font-family: Arial, sans-serif; margin: 0; font-size: 8px; width: 210mm; }
-              .header-image { width: 100%; max-height: 80px; object-fit: contain; }
-              .footer-image { width: 100%; max-height: 50px; object-fit: contain; margin-top: 10px; }
-              .container { padding: 10px; position: relative; }
-              .patient-info { border: 1px solid #000; padding: 10px; margin-bottom: 15px; }
-              .info-row { display: flex; margin-bottom: 5px; }
-              .info-label { font-weight: bold; width: 120px; }
-              .qr-code { text-align: center; margin-top: 20px; }
-              .signature-section { display: flex; justify-content: flex-end; margin-top: 20px; text-align: center; }
-              .signature-image { max-width: 150px; max-height: 60px; }
-              .stamp-image { max-width: 100px; max-height: 100px; margin-left: 20px; }
-            </style>
-          </head>
-          <body>
-            ${headerUrl ? `<img src="${headerUrl}" class="header-image" />` : ''}
-            <div class="container">
-              <div class="patient-info">
-                <div class="info-row">
-                  <span class="info-label">Patient Name:</span>
-                  <span>${patient.patientName || "N/A"}</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">MRN:</span>
-                  <span>${patient.mrn || "N/A"}</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">Gender/Age:</span>
-                  <span>${patient.gender || "N/A"} / ${calculateAge(patient.dob) || "N/A"}</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">Phone:</span>
-                  <span>${patient.phonNumber || "N/A"}</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">Visit Number:</span>
-                  <span>${visitNo}</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">Date:</span>
-                  <span>${formatDate(new Date().toISOString())}</span>
-                </div>
-              </div>
-              
-              <h2>Prescription</h2>
-              <p>This is a summary of your visit. Please follow the instructions provided by your doctor.</p>
-              
-              <div class="signature-section">
-                ${signature ? `<img src="${signature}" class="signature-image" />` : ''}
-                ${stamp ? `<img src="${stamp}" class="stamp-image" />` : ''}
-              </div>
-              
-              <div class="qr-code">
-                <img src="${qrCodeDataUrl}" width="80px" height="80px" />
-                <p>Scan to view digital record</p>
-              </div>
-            </div>
-            ${footerUrl ? `<img src="${footerUrl}" class="footer-image" />` : ''}
-          </body>
-        </html>
-      `;
-
-      // Generate PDF
-      const { uri } = await Print.printToFileAsync({
-        html: htmlContent,
-        width: 210 * 2.83465, // A4 width in points
-        height: 297 * 2.83465, // A4 height in points
-      });
-
-      // Save/share the PDF
-      const fileName = `Prescription_${patient.mrn || "unknown"}.pdf`;
-      showPDFOptions(uri, fileName);
-    } catch (error) {
-      console.error("Prescription PDF Generation Error:", error);
-      throw error;
-    }
-  };
-
-  const generateTokenPDF = async (tokenData: any) => {
-    try {
-      // Generate QR code URL using Google Charts API
-      const qrCodeUrl = `https://pakhims.com/?MRN=${encodeURIComponent(tokenData.mrn)}&visitId=${encodeURIComponent(tokenData.visitId)}`;
-      const qrCodeDataUrl = generateQRCode(qrCodeUrl);
-      
-      // Calculate dynamic height for services
-      let additionalHeight = 0;
-      const bookedServices = Array.isArray(tokenData.bookedServices) ? tokenData.bookedServices : [];
-      
-      bookedServices.forEach((item: any) => {
-        if (!item || !item.serviceName) return;
-        const serviceNameLines =
-          item.serviceName.length / 30 > 1
-            ? Math.ceil(item.serviceName.length / 30)
-            : 1;
-        additionalHeight += (serviceNameLines - 1) * 5;
-      });
-      
-      const heightPaper = 92 + (bookedServices.length * 5) + additionalHeight;
-
-      // Get hospital info
-      const hospitalName = user?.hospital?.hospitalName || "Your Hospital";
-      const hospitalPhone = user?.hospital?.phoneNo || tokenData.hospitalPhone || "N/A";
-      const hospitalAddress = user?.hospital?.address || tokenData.hospitalAddress || "Hospital Address";
-      const hospitalLogo = user?.hospital?.logoUrl || "";
-
-      // Generate HTML content for PDF with improved header/footer
-      const htmlContent = `
-        <html>
-          <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-              body { font-family: Arial, sans-serif; margin: 0; font-size: 8px; width: 80mm; }
-              .header { background-color: #000; color: #fff; text-align: center; padding: 8px 5px; }
-              .header-logo { max-height: 30px; margin-bottom: 3px; }
-              .container { padding: 5px; position: relative; }
-              .row { margin-bottom: 5px; }
-              .bold { font-weight: bold; }
-              .qr-code { margin-top: 10px; text-align: center; }
-              .table { width: 100%; margin-top: 5px; }
-              .table div { display: flex; justify-content: space-between; padding: 3px; }
-              .table-header { border-bottom: 1px solid #000; font-weight: bold; }
-              .table-row { border-bottom: 1px solid #000; }
-              .table-footer { border-top: 1px solid #000; font-weight: bold; }
-              .line { border-bottom: 1px solid #000; margin: 5px 0; }
-              .footer { margin-top: 10px; text-align: center; font-size: 7px; padding-top: 5px; border-top: 1px dashed #000; }
-              .paid { color: #bbb; font-size: 50px; text-align: center; transform: rotate(45deg); position: absolute; top: ${heightPaper / 1.5}mm; left: 30mm; opacity: 0.5; }
-              .rect { border: 1px solid #000; padding: 4px; margin: 5px 0; width: 75mm; }
-              .token { position: absolute; right: 5px; top: 15px; text-align: center; }
-              .contact-info { text-align: center; font-size: 7px; margin: 3px 0; }
-              .total-row { font-weight: bold; }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              ${hospitalLogo ? `<img src="${hospitalLogo}" class="header-logo" alt="Hospital Logo" /><br/>` : ''}
-              <div style="font-size: 10px; font-weight: bold;">${hospitalName}</div>
-              <div class="contact-info">${hospitalAddress}</div>
-              <div class="contact-info">Phone: ${hospitalPhone}</div>
-            </div>
-            <div class="container">
-              ${
-                tokenData.feeStatus === "paid"
-                  ? `<div class="paid">PAID</div>`
-                  : tokenData.feeStatus === "insurance"
-                  ? `<div class="paid">INSURANCE</div>`
-                  : ""
-              }
-              <div class="token">
-                <div style="font-size: 10px; font-weight: bold;">Token</div>
-                <div style="font-size: 17px;"># ${tokenData.tokenId || "N/A"}</div>
-              </div>
-              <div class="row" style="margin-top: 10px;">
-                <span class="bold" style="margin-left: 2mm;">MRN #:</span>
-                <span style="margin-left: 13mm;">${tokenData.mrn || "N/A"}</span>
-              </div>
-              <div class="rect">
-                <div class="row" style="font-size: 9.5px;">
-                  <span class="bold" style="margin-left: 3mm;">Name:</span>
-                  <span style="margin-left: 35mm;">${wrapString(capitalizeName(tokenData.patientName || ""), 17)}</span>
-                </div>
-                <div class="row">
-                  <span class="bold" style="margin-left: 3mm;">Phone #:</span>
-                  <span style="margin-left: 35mm;">${tokenData.phonNumber || "N/A"}</span>
-                </div>
-                <div class="row">
-                  <span class="bold" style="margin-left: 3mm;">Date & Time:</span>
-                  <span style="margin-left: 35mm;">${formatDate(tokenData.appointmentDate) || "N/A"}</span>
-                  <span style="margin-left: 57mm;">${tokenData.appointmentTime?.from || "N/A"}</span>
-                </div>
-                <div class="row">
-                  <span class="bold" style="margin-left: 3mm;">Dr. Name:</span>
-                  <span style="margin-left: 35mm;">${wrapString(capitalizeName(tokenData.doctorName || ""), 17)}</span>
-                </div>
-                <div class="row">
-                  <span class="bold" style="margin-left: 3mm;">Visit ID:</span>
-                  <span style="margin-left: 35mm;">${tokenData.visitId || "N/A"}</span>
-                </div>
-              </div>
-              <div class="table">
-                <div class="table-header">
-                  <span style="margin-left: 2mm;">Services</span>
-                  <span style="margin-right: 2mm;">Charges</span>
-                </div>
-                ${
-                  Array.isArray(tokenData.bookedServices) && tokenData.bookedServices.length > 0
-                    ? tokenData.bookedServices
-                        .map((item: any) => {
-                          if (!item || !item.serviceName) return '';
-                          const serviceNameLines =
-                            item.serviceName?.match(/.{1,30}/g) || ["N/A"];
-                          return serviceNameLines
-                            .map(
-                              (line: string, index: number) => `
-                                <div class="table-row">
-                                  <span style="margin-left: 2mm;">${line || ""}</span>
-                                  ${
-                                    index === 0
-                                      ? `<span style="margin-right: 2mm;">${item.fee || 0}/-</span>`
-                                      : "<span></span>"
-                                  }
-                                </div>
-                              `
-                            )
-                            .join("");
-                        })
-                        .join("")
-                    : '<div class="table-row"><span style="margin-left: 2mm;">No services booked</span><span></span></div>'
-                }
-                <div class="table-footer">
-                  <span style="margin-left: 2mm;">Total Fee:</span>
-                  <span style="margin-right: 2mm;">${tokenData.totalFee || calculateTotalFee(tokenData.bookedServices) || 0}/-</span>
-                </div>
-                ${tokenData.discount > 0 ? `
-                  <div class="table-row">
-                    <span style="margin-left: 2mm;">Discount:</span>
-                    <span style="margin-right: 2mm;">${tokenData.discount || 0}/-</span>
-                  </div>
-                  <div class="total-row">
-                    <span style="margin-left: 2mm;">Net Payable:</span>
-                    <span style="margin-right: 2mm;">${(tokenData.totalFee || calculateTotalFee(tokenData.bookedServices) || 0) - (tokenData.discount || 0)}/-</span>
-                  </div>
-                ` : ''}
-              </div>
-              <div class="row" style="margin-top: 5px;">
-                <span class="bold" style="margin-left: 2mm;">Fee Status:</span>
-                <span style="margin-left: 15mm; text-transform: uppercase;">${tokenData.feeStatus || "pending"}</span>
-              </div>
-              <div class="line"></div>
-              <div class="qr-code">
-                <img src="${qrCodeDataUrl}" width="20mm" height="20mm" />
-                <div style="font-size: 7px; margin-top: 3px;">Scan to view digital record</div>
-              </div>
-              <div class="footer">
-                <div>Software Powered by PakHIMS - Hospital Information Management System</div>
-                <div>© ${new Date().getFullYear()} Cure Logics, Rahim Yar Khan</div>
-                <div>www.pakhims.com | support@pakhims.com</div>
-              </div>
-            </div>
-          </body>
-        </html>
-      `;
-
-      // Generate PDF
-      const { uri } = await Print.printToFileAsync({
-        html: htmlContent,
-        width: 80 * 2.83465, // 80mm in points
-        height: heightPaper * 2.83465, // Dynamic height in points
-      });
-
-      // Save/share the PDF
-      const fileName = `Token_${tokenData.tokenId || tokenData.visitId || "unknown"}.pdf`;
-      showPDFOptions(uri, fileName);
-    } catch (error) {
-      console.error("Token PDF Generation Error:", error);
-      throw error;
-    }
-  };
-
-  const showPDFOptions = (uri: string, fileName: string) => {
-    Alert.alert(
-      "PDF Generated",
-      "What would you like to do with the PDF?",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-          onPress: async () => {
-            try {
-              await FileSystem.deleteAsync(uri, { idempotent: true });
-            } catch (error) {
-              console.warn("Failed to delete temporary file:", error);
-            }
-          },
-        },
-        {
-          text: "Share",
-          onPress: async () => {
-            if (await Sharing.isAvailableAsync()) {
-              await Sharing.shareAsync(uri, {
-                mimeType: "application/pdf",
-                dialogTitle: "Share PDF",
-              });
-            } else {
-              Alert.alert("Error", "Sharing not available on this device.");
-            }
-            try {
-              await FileSystem.deleteAsync(uri, { idempotent: true });
-            } catch (error) {
-              console.warn("Failed to delete temporary file:", error);
-            }
-          },
-        },
-        {
-          text: "Save",
-          onPress: async () => {
-            let fileUri = "";
-            if (Platform.OS === "android") {
-              try {
-                const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
-                if (permissions.granted) {
-                  const base64 = await FileSystem.readAsStringAsync(uri, {
-                    encoding: FileSystem.EncodingType.Base64,
-                  });
-                  fileUri = await FileSystem.StorageAccessFramework.createFileAsync(
-                    permissions.directoryUri,
-                    fileName,
-                    "application/pdf"
-                  );
-                  await FileSystem.writeAsStringAsync(fileUri, base64, {
-                    encoding: FileSystem.EncodingType.Base64,
-                  });
-                  Alert.alert("Success", `PDF saved to selected location: ${fileName}`);
-                } else {
-                  Alert.alert("Error", "Storage access permission denied.");
-                  fileUri = `${FileSystem.documentDirectory}${fileName}`;
-                  await FileSystem.moveAsync({ from: uri, to: fileUri });
-                  Alert.alert(
-                    "Fallback",
-                    `Saved to app's document directory: ${fileUri}`
-                  );
-                }
-              } catch (error) {
-                console.error("Save error:", error);
-                fileUri = `${FileSystem.documentDirectory}${fileName}`;
-                await FileSystem.moveAsync({ from: uri, to: fileUri });
-                Alert.alert(
-                  "Fallback",
-                  `Failed to save to selected location. Saved to: ${fileUri}`
-                );
-              }
-            } else {
-              fileUri = `${FileSystem.documentDirectory}${fileName}`;
-              await FileSystem.moveAsync({ from: uri, to: fileUri });
-              Alert.alert(
-                "Success",
-                `PDF saved to: ${fileUri}\nYou can share it to save to another location.`,
-                [
-                  { text: "OK", style: "cancel" },
-                  {
-                    text: "Share",
-                    onPress: async () => {
-                      if (await Sharing.isAvailableAsync()) {
-                        await Sharing.shareAsync(fileUri, {
-                          mimeType: "application/pdf",
-                          dialogTitle: "Share PDF",
-                        });
-                      } else {
-                        Alert.alert("Error", "Sharing not available on this device.");
-                      }
-                    },
-                  },
-                ]
-              );
-            }
-          },
-        },
-      ],
-      { cancelable: true }
-    );
-  };
-
-  const renderAppointmentItem = ({ item, index }: ListRenderItemInfo<Appointment>): React.ReactElement => {
-    const animations = itemAnimations.get(item._id) || {
-      fadeAnim: new Animated.Value(1),
-      translateY: new Animated.Value(0),
-    };
-
+  const renderAppointmentItem = ({
+    item,
+    index,
+  }: ListRenderItemInfo<Appointment>) => {
+    const animations =
+      itemAnimations.get(item._id) || {
+        fadeAnim: new Animated.Value(1),
+        translateY: new Animated.Value(0),
+      };
     return (
       <Animated.View
-        style={[{ opacity: animations.fadeAnim, transform: [{ translateY: animations.translateY }] }]}
+        style={{
+          opacity: animations.fadeAnim,
+          transform: [{ translateY: animations.translateY }],
+        }}
       >
         <AppointmentCard
           appointment={{
             _id: item._id,
             patientId: {
-              patientName: item.patientId?.patientName || "Unknown",
-              mrn: item.patientId?.mrn || "N/A",
+              patientName: item.patientId?.patientName ?? "Unknown",
+              mrn: item.patientId?.mrn ?? "N/A",
             },
             doctor: {
-              fullName: item.doctor?.fullName || "Not assigned",
+              fullName: item.doctor?.fullName ?? "Not assigned",
             },
             appointmentDate: item.appointmentDate,
-            slot: item.slot || "N/A",
+            slot: item.slot ?? "N/A",
             isCanceled: item.isApmtCanceled,
             isPrescriptionCreated: item.isPrescriptionCreated,
             isChecked: item.isPrescriptionCreated,
@@ -939,12 +1038,12 @@ const DashboardScreen = () => {
   return (
     <View style={styles.container}>
       <Animated.View
-        style={[styles.header, { opacity: fadeAnim, transform: [{ translateY: translateY }] }]}
+        style={[styles.header, { opacity: fadeAnim, transform: [{ translateY }] }]}
       >
         <View style={styles.greetingContainer}>
           <Text style={styles.greeting}>Hello,</Text>
           <Text style={styles.userName} numberOfLines={1} ellipsizeMode="tail">
-            {user?.fullName || "User"}
+            {user?.fullName ?? "User"}
           </Text>
         </View>
         <View style={styles.headerButtons}>
@@ -957,7 +1056,7 @@ const DashboardScreen = () => {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.appointmentButton}
-            onPress={() => router.push("/registration/PatientRegistration")}
+            onPress={handleNavigateToAppointment}
           >
             <Text style={styles.appointmentText}>+ Appointment</Text>
           </TouchableOpacity>
@@ -965,7 +1064,7 @@ const DashboardScreen = () => {
       </Animated.View>
 
       <Animated.View
-        style={[styles.searchContainer, { opacity: fadeAnim, transform: [{ translateY: translateY }] }]}
+        style={[styles.searchContainer, { opacity: fadeAnim, transform: [{ translateY }] }]}
       >
         <Ionicons name="search" size={18} color={COLORS.textSecondary} style={styles.searchIcon} />
         <TextInput
@@ -976,7 +1075,7 @@ const DashboardScreen = () => {
           onChangeText={setSearchQuery}
           keyboardType="default"
           returnKeyType="search"
-          onSubmitEditing={handleSearch}
+          onSubmitEditing={(e) => setSearchQuery(e.nativeEvent.text)}
         />
         {searchQuery ? (
           <TouchableOpacity
@@ -1010,13 +1109,13 @@ const DashboardScreen = () => {
         </View>
       ) : (
         <FlatList
-          data={appointmentsData?.data || []}
+          data={appointmentsData?.data ?? []}
           keyExtractor={(item: Appointment) => item._id}
           renderItem={renderAppointmentItem}
           contentContainerStyle={styles.listContainer}
           ListEmptyComponent={
             <Animated.View
-              style={[styles.emptyContainer, { opacity: fadeAnim, transform: [{ translateY: translateY }] }]}
+              style={[styles.emptyContainer, { opacity: fadeAnim, transform: [{ translateY }] }]}
             >
               <Ionicons name="calendar-outline" size={48} color={COLORS.lightGray} />
               <Text style={styles.emptyText}>No appointments found</Text>
@@ -1033,7 +1132,7 @@ const DashboardScreen = () => {
               ) : (
                 <TouchableOpacity
                   style={styles.createAppointmentButton}
-                  onPress={() => router.push("/registration/PatientRegistration")}
+                  onPress={handleNavigateToAppointment}
                 >
                   <Text style={styles.createAppointmentText}>Create Appointment</Text>
                 </TouchableOpacity>
@@ -1047,6 +1146,12 @@ const DashboardScreen = () => {
         onClose={() => setInstructionsVisible(false)}
         navigateToAppointment={handleNavigateToAppointment}
         navigateToPatients={handleNavigateToPatients}
+      />
+      <PreviewPDFModal
+        visible={previewVisible}
+        htmlContent={previewHtml}
+        fileName={previewFileName}
+        onClose={() => setPreviewVisible(false)}
       />
     </View>
   );
@@ -1210,6 +1315,49 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
     marginLeft: 4,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.lightGray,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: COLORS.textPrimary,
+  },
+  webView: {
+    flex: 1,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    padding: 16,
+    gap: 10,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  saveButton: {
+    backgroundColor: COLORS.primary,
+  },
+  cancelButton: {
+    backgroundColor: COLORS.lightGray,
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 14,
+
   },
 });
 
