@@ -205,7 +205,7 @@ const CreateAppointmentScreen: React.FC = () => {
   useEffect(() => {
     const intervalId = setInterval(() => {
       setCurrentTime(new Date());
-    }, 60000);
+    }, 100000);
     return () => clearInterval(intervalId);
   }, []);
 

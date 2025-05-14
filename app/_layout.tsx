@@ -8,6 +8,7 @@ import { StatusBar } from "react-native";
 import { useEffect } from 'react';
 import { I18nManager } from 'react-native';
 
+import { NavigationContainer } from '@react-navigation/native';
 
 const Layout = () => {
   // Add this inside your main component
@@ -25,6 +26,7 @@ useEffect(() => {
   }
 }, []);
   return (
+    <NavigationContainer>
     <Provider store={store}>  
       <PersistGate loading={null} persistor={persistor}>
         <PaperProvider>
@@ -33,6 +35,8 @@ useEffect(() => {
         </PaperProvider>
       </PersistGate>
     </Provider>
+        </NavigationContainer>
+
   );
 };
 

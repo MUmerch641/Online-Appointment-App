@@ -173,15 +173,15 @@ const Welcome = () => {
 
       <View style={styles.trustIndicators}>
         <View style={styles.trustItem}>
-          <MaterialCommunityIcons name="shield-check" size={18} color={COLORS.success} />
+          <MaterialCommunityIcons name="shield-check" size={15} color={COLORS.success} />
           <Text style={styles.trustText}>Verified Doctors</Text>
         </View>
         <View style={styles.trustItem}>
-          <MaterialCommunityIcons name="clock-time-four" size={18} color={COLORS.success} />
+          <MaterialCommunityIcons name="clock-time-four" size={15} color={COLORS.success} />
           <Text style={styles.trustText}>24/7 Support</Text>
         </View>
         <View style={styles.trustItem}>
-          <MaterialCommunityIcons name="hospital-box" size={18} color={COLORS.success} />
+          <MaterialCommunityIcons name="hospital-box" size={15} color={COLORS.success} />
           <Text style={styles.trustText}>Private Consultations</Text>
         </View>
       </View>
