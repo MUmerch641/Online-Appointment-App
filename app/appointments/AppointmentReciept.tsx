@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from "react";
 import {
   View,
@@ -25,7 +24,7 @@ import { useGetHospitalByProjectIdQuery } from "../../redux/api/authApi";
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux/store";
 import { LinearGradient } from "expo-linear-gradient";
-import LottieView from "lottie-react-native";
+import * as Animatable from 'react-native-animatable';
 import { COLORS } from "@/constants/Colors";
 
 interface ReceiptData {
@@ -59,7 +58,6 @@ const AppointmentTokenScreen = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   const viewShotRef = useRef<ViewShot>(null);
-  const lottieRef = useRef<LottieView>(null);
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
@@ -67,8 +65,16 @@ const AppointmentTokenScreen = () => {
   const tokenRotate = useRef(new Animated.Value(0)).current;
 
   const [generateToken, { isLoading }] = useGenerateAppointmentTokenMutation();
+  // Ensure projectId is always a string
+  const resolvedProjectId =
+    typeof projectId === "string"
+      ? projectId
+      : Array.isArray(projectId)
+      ? projectId[0]
+      : useSelector((state: RootState) => state.auth.user?.projectId) || "";
+
   const { data: hospitalData, isLoading: hospitalLoading } = useGetHospitalByProjectIdQuery(
-    projectId || useSelector((state: RootState) => state.auth.user?.projectId)
+    resolvedProjectId
   );
 
   useEffect(() => {
@@ -104,10 +110,6 @@ const AppointmentTokenScreen = () => {
               useNativeDriver: true,
             })
           ]).start();
-          
-          if (lottieRef.current) {
-            lottieRef.current.play();
-          }
         } else {
           setErrorMessage(response?.message || "Failed to load receipt");
         }
@@ -234,13 +236,21 @@ const AppointmentTokenScreen = () => {
   if (isLoading || hospitalLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <LottieView
-          source={require('../../assets/images/loading.json')}
-          autoPlay
-          loop
+        <Animatable.View 
+          animation="pulse" 
+          iterationCount="infinite" 
+          duration={1500}
           style={styles.loadingAnimation}
-        />
-        <Text style={styles.loadingText}>Loading token...</Text>
+        >
+          <Ionicons name="medical" size={80} color={COLORS.primary} />
+        </Animatable.View>
+        <Animatable.Text 
+          animation="fadeIn" 
+          duration={1000}
+          style={styles.loadingText}
+        >
+          Loading token...
+        </Animatable.Text>
       </View>
     );
   }
@@ -248,13 +258,20 @@ const AppointmentTokenScreen = () => {
   if (errorMessage || !receiptData) {
     return (
       <View style={styles.errorContainer}>
-        <LottieView
-          source={require('../../assets/images/error.json')}
-          autoPlay
-          loop={false}
+        <Animatable.View 
+          animation="shake" 
+          duration={1000}
           style={styles.errorAnimation}
-        />
-        <Text style={styles.errorText}>{errorMessage || "Token data not available"}</Text>
+        >
+          <Ionicons name="alert-circle" size={80} color={COLORS.danger} />
+        </Animatable.View>
+        <Animatable.Text 
+          animation="fadeIn" 
+          duration={800}
+          style={styles.errorText}
+        >
+          {errorMessage || "Token data not available"}
+        </Animatable.Text>
         <TouchableOpacity 
           style={styles.retryButton} 
           onPress={goBack}
@@ -499,8 +516,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   loadingAnimation: {
-    width: 200,
-    height: 200,
+    width: 150,
+    height: 150,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   loadingText: {
     marginTop: 10,
@@ -518,6 +537,8 @@ const styles = StyleSheet.create({
   errorAnimation: {
     width: 150,
     height: 150,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   errorText: {
     fontSize: 16,

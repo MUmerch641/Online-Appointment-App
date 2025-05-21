@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View, TouchableOpacity, Animated, Easing, Dimensions } from "react-native";
 import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "expo-router";
-import LottieView from "lottie-react-native";
+import * as Animatable from 'react-native-animatable';
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "@/constants/Colors";
@@ -95,12 +95,40 @@ const Welcome = () => {
       <View style={styles.circle2}></View>
 
       <View style={styles.animationContainer}>
-        <LottieView
-          source={require("../assets/images/Doctor.json")}
-          autoPlay
-          loop
-          style={styles.animation}
-        />
+        <Animatable.View 
+          animation="pulse" 
+          iterationCount="infinite"
+          duration={2500}
+          useNativeDriver
+          style={styles.iconContainer}
+        >
+          <Animatable.View
+            animation="bounceIn"
+            duration={1500}
+            style={styles.innerIconContainer}
+          >
+            <MaterialCommunityIcons 
+              name="hospital-building" 
+              size={80} 
+              color={COLORS.primary} 
+            />
+          </Animatable.View>
+          <Animatable.Text 
+            animation="fadeIn" 
+            duration={1800} 
+            style={styles.animationText}
+          >
+            Healthcare
+          </Animatable.Text>
+          <Animatable.Text 
+            animation="fadeIn" 
+            duration={1800} 
+            delay={400}
+            style={[styles.animationText, { color: COLORS.secondary }]}
+          >
+            Management System
+          </Animatable.Text>
+        </Animatable.View>
       </View>
 
       <Animated.View
@@ -173,15 +201,15 @@ const Welcome = () => {
 
       <View style={styles.trustIndicators}>
         <View style={styles.trustItem}>
-          <MaterialCommunityIcons name="shield-check" size={15} color={COLORS.success} />
+          <MaterialCommunityIcons name="shield-check" size={18} color={COLORS.success} />
           <Text style={styles.trustText}>Verified Doctors</Text>
         </View>
         <View style={styles.trustItem}>
-          <MaterialCommunityIcons name="clock-time-four" size={15} color={COLORS.success} />
+          <MaterialCommunityIcons name="clock-time-four" size={18} color={COLORS.success} />
           <Text style={styles.trustText}>24/7 Support</Text>
         </View>
         <View style={styles.trustItem}>
-          <MaterialCommunityIcons name="hospital-box" size={15} color={COLORS.success} />
+          <MaterialCommunityIcons name="hospital-box" size={18} color={COLORS.success} />
           <Text style={styles.trustText}>Private Consultations</Text>
         </View>
       </View>
@@ -202,10 +230,38 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 280,
     padding: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   animation: {
     width: "100%",
     height: "100%",
+  },
+  iconContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+  },
+  innerIconContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 75,
+    width: 150,
+    height: 150,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+    marginBottom: 15,
+  },
+  animationText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+    textAlign: 'center',
+    marginTop: 5,
   },
   textContainer: {
     alignItems: "center",

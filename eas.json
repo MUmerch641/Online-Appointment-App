@@ -4,7 +4,10 @@
   },
   "build": {
     "development": {
+      "developmentClient": true,
+      "distribution": "internal",
       "android": {
+        "gradleCommand": ":app:assembleDebug",
         "buildType": "apk"
       },
       "env": {
@@ -29,10 +32,17 @@
     },
     "production": {
       "android": {
+        "gradleCommand": ":app:bundleRelease",
         "buildType": "app-bundle"
       },
       "env": {
         "ENV": "production"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
       }
     }
   }
