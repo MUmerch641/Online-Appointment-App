@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "PakHIMS",
-    "slug": "pakhim",
+    "slug": "pakhims",
     "version": "1.0.2",
     "entryPoint": "./node_modules/expo-router/entry",
     "orientation": "portrait",
@@ -24,7 +24,7 @@
         "origin": false
       },
       "eas": {
-        "projectId": "5675d953-5c33-4567-85d2-b8c8a6fb6ba4"
+        "projectId": "a55ff28d-becd-4387-a9b7-9ee76481ea7b"
       }
     },
     "ios": {
@@ -65,6 +65,6 @@
     "experiments": {
       "typedRoutes": true
     },
-    "owner": "umerkhadim"
+    "owner": "usmanty"
   }
 }
